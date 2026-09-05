@@ -1,8 +1,9 @@
 import { View } from "react-native";
 import { Bar, CartesianChart } from "victory-native";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
-import { Motion, Palette } from "@/constants/theme";
+import { Motion, Palette, Spacing } from "@/constants/theme";
 import { useChartFont } from "@/hooks/use-chart-font";
 import { goalsByMatchday } from "@/lib/series";
 import type { Match } from "@/lib/types";
@@ -33,9 +34,20 @@ const PAST_OPACITY = 0.4;
  * ve sin leer una sola cifra. Sin leyenda, porque la posición ya lo dice: la
  * llena es la de la derecha, la de la fecha más reciente.
  */
-export function GoalsTrend({ matches }: { matches: Match[] | null }) {
+export function GoalsTrend({
+  matches,
+  pending = false,
+}: {
+  matches: Match[] | null;
+  /** Primera carga: sin esto se anunciaría que faltan retas por jugar. */
+  pending?: boolean;
+}) {
   const data = goalsByMatchday(matches);
   const font = useChartFont(11);
+
+  if (pending) {
+    return <GoalsTrendSkeleton />;
+  }
 
   if (data.length < MIN_MATCHDAYS) {
     return (
@@ -91,6 +103,34 @@ export function GoalsTrend({ matches }: { matches: Match[] | null }) {
           </>
         )}
       </CartesianChart>
+    </View>
+  );
+}
+
+/** Alturas de las barras del esqueleto, en tanto por uno del lienzo. */
+const SKELETON_BARS = [0.45, 0.7, 0.35, 0.85, 0.55, 0.65] as const;
+
+function GoalsTrendSkeleton() {
+  return (
+    <View
+      style={{
+        height: CHART_HEIGHT,
+        flexDirection: "row",
+        alignItems: "flex-end",
+        justifyContent: "space-between",
+        gap: Spacing.three,
+        paddingHorizontal: Spacing.three,
+      }}
+    >
+      {SKELETON_BARS.map((ratio, index) => (
+        <View
+          // Las alturas pueden repetirse, así que la posición es la identidad.
+          key={`bar-${index}`}
+          style={{ flex: 1 }}
+        >
+          <Skeleton height={CHART_HEIGHT * ratio} />
+        </View>
+      ))}
     </View>
   );
 }

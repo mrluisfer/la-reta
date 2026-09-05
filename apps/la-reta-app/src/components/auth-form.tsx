@@ -1,16 +1,25 @@
 import { useSignIn, useSignUp } from "@clerk/expo";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GoogleButton } from "@/components/auth/google-button";
 import { Notice } from "@/components/notice";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field } from "@/components/ui/field";
 import { GlassSurface } from "@/components/ui/glass-surface";
 import { Text } from "@/components/ui/text";
 import { MaxContentWidth, Palette, Radius, Spacing } from "@/constants/theme";
+import { API_URL } from "@/lib/api";
 import { authErrorMessage, globalErrorMessage } from "@/lib/auth-errors";
 import { closeOverlay } from "@/lib/navigation";
 
@@ -34,6 +43,9 @@ import { closeOverlay } from "@/lib/navigation";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const CODE_LENGTH = 6;
+/** Mínimo de Clerk para esta instancia. Se comprueba aquí para no gastar una
+ *  ida y vuelta en decir lo que ya se sabe antes de salir del teléfono. */
+const MIN_PASSWORD = 6;
 
 export type AuthMode = "sign-in" | "sign-up";
 
@@ -80,6 +92,32 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const [code, setCode] = useState("");
   const [step, setStep] = useState<Step>("credentials");
   const [localError, setLocalError] = useState<string | null>(null);
+  /**
+   * Lo que falta, por campo.
+   *
+   * Antes todo caía en un aviso general arriba del todo: en un teléfono
+   * pequeño quedaba fuera de pantalla, así que tocar "Iniciar sesión" parecía
+   * no hacer nada. Ahora el campo se pinta en rojo y dice qué le pasa, que es
+   * donde el ojo ya está mirando.
+   */
+  const [localFields, setLocalFields] = useState<{
+    email?: string;
+    password?: string;
+    terms?: string;
+  }>({});
+
+  /**
+   * Los dos consentimientos del alta, separados a propósito.
+   *
+   * Aceptar las condiciones es obligatorio y se manda a Clerk en su campo
+   * propio (`legalAccepted`), que es para lo que existe. El boletín es opcional
+   * y va a los metadatos de la cuenta: es una preferencia del usuario, no un
+   * requisito para entrar, y mezclar las dos casillas en una sola —"acepto todo
+   * y además quiero correos"— es exactamente lo que la ley llama consentimiento
+   * no informado.
+   */
+  const [terms, setTerms] = useState(false);
+  const [newsletter, setNewsletter] = useState(false);
 
   const busy = (mode === "sign-in" ? signInFetch : signUpFetch) === "fetching";
 
@@ -88,14 +126,30 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const submitCredentials = async () => {
     setLocalError(null);
 
-    if (!EMAIL_PATTERN.test(email.trim())) {
-      setLocalError("Ese correo no se ve bien.");
-      return;
+    // Se juntan todos los fallos y se enseñan a la vez: arreglar el correo para
+    // que entonces te digan lo de la contraseña es la forma más rápida de que
+    // alguien abandone.
+    const missing: {
+      email?: string;
+      password?: string;
+      terms?: string;
+    } = {};
+    if (email.trim().length === 0) {
+      missing.email = "Escribe tu correo.";
+    } else if (!EMAIL_PATTERN.test(email.trim())) {
+      missing.email = "Ese correo no se ve bien.";
     }
     if (password.length === 0) {
-      setLocalError("Falta la contraseña.");
-      return;
+      missing.password = "Escribe tu contraseña.";
+    } else if (mode === "sign-up" && password.length < MIN_PASSWORD) {
+      missing.password = `Al menos ${MIN_PASSWORD} caracteres.`;
     }
+    if (mode === "sign-up" && !terms) {
+      missing.terms = "Hay que aceptar las condiciones para crear la cuenta.";
+    }
+
+    setLocalFields(missing);
+    if (Object.keys(missing).length > 0) return;
 
     if (mode === "sign-in") {
       const { error } = await signIn.password({
@@ -126,6 +180,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       emailAddress: email.trim(),
       password,
       firstName: name.trim() || undefined,
+      legalAccepted: terms,
+      unsafeMetadata: { newsletter },
     });
     if (error) return;
 
@@ -215,6 +271,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
             style={{ borderRadius: Radius.pill, overflow: "hidden" }}
           >
             <Button
+              icon="close"
               label="Cerrar"
               onPress={() => closeOverlay(router, "/")}
               size="md"
@@ -237,10 +294,6 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           </Text>
         </View>
 
-        {globalError === undefined ? null : (
-          <Notice detail={globalError} title="No pudimos continuar" />
-        )}
-
         {step === "code" ? (
           <View style={{ gap: Spacing.three }}>
             <Field
@@ -256,6 +309,10 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
               returnKeyType="go"
               value={code}
             />
+
+            {globalError === undefined ? null : (
+              <Notice detail={globalError} title="No pudimos continuar" />
+            )}
 
             <Button
               disabled={code.length < CODE_LENGTH}
@@ -289,7 +346,21 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         ) : (
           <>
             <View style={{ gap: Spacing.three }}>
-              <GoogleButton onError={setLocalError} />
+              {/* Con Google el alta no pasa por el formulario, así que las
+                  condiciones se comprueban aquí también: si no, entrar por ese
+                  botón sería la forma de saltárselas. */}
+              <GoogleButton
+                newsletter={newsletter}
+                onError={setLocalError}
+                onBlocked={() =>
+                  setLocalFields((current) => ({
+                    ...current,
+                    terms:
+                      "Hay que aceptar las condiciones para crear la cuenta.",
+                  }))
+                }
+                requireTerms={mode === "sign-up" && !terms}
+              />
 
               <View
                 style={{
@@ -334,11 +405,17 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
               <Field
                 autoCapitalize="none"
                 autoComplete="email"
-                error={emailError}
+                error={localFields.email ?? emailError}
                 inputMode="email"
                 keyboardType="email-address"
                 label="Correo"
-                onChangeText={setEmail}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  setLocalFields((current) => ({
+                    ...current,
+                    email: undefined,
+                  }));
+                }}
                 placeholder="tu@correo.com"
                 returnKeyType="next"
                 value={email}
@@ -349,9 +426,19 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
                 autoComplete={
                   mode === "sign-up" ? "new-password" : "current-password"
                 }
-                error={passwordError}
-                label="Contraseña"
-                onChangeText={setPassword}
+                error={localFields.password ?? passwordError}
+                label={
+                  mode === "sign-up"
+                    ? `Contraseña (mínimo ${MIN_PASSWORD})`
+                    : "Contraseña"
+                }
+                onChangeText={(value) => {
+                  setPassword(value);
+                  setLocalFields((current) => ({
+                    ...current,
+                    password: undefined,
+                  }));
+                }}
                 onSubmitEditing={submitCredentials}
                 placeholder="Tu contraseña"
                 returnKeyType="go"
@@ -360,7 +447,56 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
               />
             </View>
 
+            {mode === "sign-up" ? (
+              <View style={{ gap: Spacing.three }}>
+                <Checkbox
+                  checked={terms}
+                  error={localFields.terms}
+                  label={
+                    <Text tone="muted" variant="caption">
+                      Acepto las{" "}
+                      <Text
+                        onPress={() =>
+                          WebBrowser.openBrowserAsync(`${API_URL}/legal`)
+                        }
+                        tone="accent"
+                        variant="caption"
+                      >
+                        condiciones y el aviso de privacidad
+                      </Text>
+                      .
+                    </Text>
+                  }
+                  onChange={(next) => {
+                    setTerms(next);
+                    setLocalFields((current) => ({
+                      ...current,
+                      terms: undefined,
+                    }));
+                  }}
+                />
+
+                <Checkbox
+                  checked={newsletter}
+                  label={
+                    <Text tone="muted" variant="caption">
+                      Quiero enterarme de lo nuevo de la app y de la reta.
+                      Opcional, y se puede quitar después.
+                    </Text>
+                  }
+                  onChange={setNewsletter}
+                />
+              </View>
+            ) : null}
+
             <View style={{ gap: Spacing.three }}>
+              {/* El aviso va justo encima del botón que lo provoca. Arriba del
+                  todo se quedaba fuera de pantalla en un teléfono pequeño, y
+                  entonces tocar "Iniciar sesión" parecía no hacer nada. */}
+              {globalError === undefined ? null : (
+                <Notice detail={globalError} title="No pudimos continuar" />
+              )}
+
               <Button
                 label={copy.submit}
                 loading={busy}
@@ -374,26 +510,32 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
                 </Text>
               )}
 
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: Spacing.one,
-                }}
+              {/* La frase entera es el objetivo, no solo las dos palabras del
+                  final: en un teléfono pequeño el pulgar cae sobre "¿Todavía no
+                  tienes cuenta?" y espera que pase algo. De paso desaparece el
+                  relleno del botón, que descuadraba la línea. */}
+              <Pressable
+                accessibilityLabel={`${copy.switchText} ${copy.switchAction}`}
+                accessibilityRole="button"
+                onPress={() =>
+                  router.replace(mode === "sign-in" ? "/sign-up" : "/sign-in")
+                }
+                style={({ pressed }) => ({
+                  alignSelf: "center",
+                  paddingVertical: Spacing.two,
+                  paddingHorizontal: Spacing.three,
+                  opacity: pressed ? 0.5 : 1,
+                })}
               >
-                <Text tone="muted" variant="caption">
-                  {copy.switchText}
+                <Text variant="caption">
+                  <Text tone="muted" variant="caption">
+                    {copy.switchText}{" "}
+                  </Text>
+                  <Text tone="accent" variant="caption">
+                    {copy.switchAction}
+                  </Text>
                 </Text>
-                <Button
-                  label={copy.switchAction}
-                  onPress={() =>
-                    router.replace(mode === "sign-in" ? "/sign-up" : "/sign-in")
-                  }
-                  size="md"
-                  variant="plain"
-                />
-              </View>
+              </Pressable>
             </View>
           </>
         )}

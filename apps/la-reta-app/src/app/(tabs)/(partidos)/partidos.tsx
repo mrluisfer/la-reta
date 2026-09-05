@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { FlatList, RefreshControl, View } from "react-native";
 
-import { MatchCard } from "@/components/match-card";
+import { MatchCard, MatchCardSkeleton } from "@/components/match-card";
 import { Notice } from "@/components/notice";
 import { Text } from "@/components/ui/text";
 import {
@@ -12,6 +12,9 @@ import {
 } from "@/constants/theme";
 import { useReta } from "@/hooks/use-reta";
 
+/** Cuántas tarjetas en hueco caben en una pantalla antes de hacer scroll. */
+const SKELETON_CARDS = Array.from({ length: 3 }, (_, i) => `hueco-${i}`);
+
 /**
  * Historial de partidos, del más reciente al más viejo — el orden en que ya
  * llegan de la API.
@@ -21,7 +24,7 @@ import { useReta } from "@/hooks/use-reta";
  */
 export default function PartidosScreen() {
   const router = useRouter();
-  const { matches, players, loading, error, refetch } = useReta();
+  const { matches, players, loading, pending, error, refetch } = useReta();
 
   return (
     <FlatList
@@ -34,11 +37,22 @@ export default function PartidosScreen() {
         paddingTop: Spacing.three,
         paddingBottom: BottomTabInset + Spacing.five,
       }}
+      aria-busy={pending}
       contentInsetAdjustmentBehavior="automatic"
       data={matches ?? []}
       keyExtractor={(match) => String(match.id)}
       ListEmptyComponent={
-        loading ? null : (
+        // Tres estados distintos y ninguno se puede confundir con otro: en la
+        // primera carga van las tarjetas en hueco, mientras se refresca no se
+        // dice nada (lo de antes sigue en pantalla) y solo con la respuesta en
+        // la mano se afirma que no hay partidos.
+        pending ? (
+          <View style={{ gap: Spacing.three }}>
+            {SKELETON_CARDS.map((key) => (
+              <MatchCardSkeleton key={key} showDate />
+            ))}
+          </View>
+        ) : loading ? null : (
           <View style={{ paddingVertical: Spacing.six, alignItems: "center" }}>
             <Text tone="faint" variant="caption">
               Todavía no hay partidos registrados.
@@ -59,7 +73,9 @@ export default function PartidosScreen() {
       refreshControl={
         <RefreshControl
           onRefresh={refetch}
-          refreshing={loading}
+          // La primera carga la cuentan las tarjetas en hueco; el indicador de
+          // arriba queda para el refresco a mano.
+          refreshing={loading && !pending}
           tintColor={Palette.accent}
         />
       }

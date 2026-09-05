@@ -17,15 +17,31 @@ import { shareRetaInvite } from "@/lib/reta-invite";
  * la app leer nada de lo que ya hay. En iOS 17+ el sistema lo enseña como tal,
  * así que el usuario ve que no vamos a fisgar su agenda.
  *
- * Si algo no está —web, permiso denegado, ningún calendario donde escribir— cae
- * al archivo `.ics` por la hoja de compartir, que funciona en todas partes sin
- * pedir nada.
+ * Si algo no está —web, Expo Go, permiso denegado, ningún calendario donde
+ * escribir— cae al archivo `.ics` por la hoja de compartir, que funciona en
+ * todas partes sin pedir nada.
  */
 
 /** Aviso dos horas antes, que es cuando uno decide si va o no. */
 const ALARM_OFFSET_MINUTES = -120;
 /** Una reta dura sus dos horas de cancha. */
 const DURATION_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Si el API de calendario existe siquiera.
+ *
+ * En Expo Go no existe: `expo-calendar` sustituye el módulo nativo por un stub
+ * cuyos métodos son de instancia, y el paquete los reexporta desde la clase
+ * (`export const requestCalendarPermissions = InternalExpoCalendar.requestCalendarPermissions`),
+ * así que llegan aquí como `undefined`. Llamarlos reventaba con "undefined is
+ * not a function" dentro de la promesa, sin que nadie lo recogiera.
+ *
+ * Se comprueba en vez de confiar en el `try`: así el camino de Expo Go es el
+ * mismo que el de web —compartir el `.ics`— y no una excepción disfrazada.
+ */
+function hasCalendarApi(): boolean {
+  return typeof Calendar.requestCalendarPermissions === "function";
+}
 
 /** El calendario donde escribir. iOS tiene uno por defecto; Android no. */
 async function writableCalendar(): Promise<Calendar.ExpoCalendar | null> {
@@ -38,31 +54,38 @@ async function writableCalendar(): Promise<Calendar.ExpoCalendar | null> {
 }
 
 export async function addRetaToCalendar(): Promise<void> {
-  if (Platform.OS === "web") {
+  if (Platform.OS === "web" || !hasCalendarApi()) {
     await shareRetaInvite();
     return;
   }
 
-  const { granted } = await Calendar.requestCalendarPermissions(true);
-  if (!granted) {
+  try {
+    const { granted } = await Calendar.requestCalendarPermissions(true);
+    if (!granted) {
+      await shareRetaInvite();
+      return;
+    }
+
+    const calendar = await writableCalendar();
+    if (calendar === null) {
+      await shareRetaInvite();
+      return;
+    }
+
+    const start = nextReta().kickoff;
+
+    await calendar.addEventWithForm({
+      title: "La Reta",
+      startDate: start,
+      endDate: new Date(start.getTime() + DURATION_MS),
+      location: venueQuery(),
+      notes: `Reta en ${VENUE.name}.`,
+      alarms: [{ relativeOffset: ALARM_OFFSET_MINUTES }],
+    });
+  } catch {
+    // Un teléfono sin app de calendario, un stub que revienta a mitad, lo que
+    // sea: el usuario tocó "agregar al calendario" y algo tiene que llevarse.
+    // Cancelar la hoja del sistema no pasa por aquí — eso resuelve, no lanza.
     await shareRetaInvite();
-    return;
   }
-
-  const calendar = await writableCalendar();
-  if (calendar === null) {
-    await shareRetaInvite();
-    return;
-  }
-
-  const start = nextReta().kickoff;
-
-  await calendar.addEventWithForm({
-    title: "La Reta",
-    startDate: start,
-    endDate: new Date(start.getTime() + DURATION_MS),
-    location: venueQuery(),
-    notes: `Reta en ${VENUE.name}.`,
-    alarms: [{ relativeOffset: ALARM_OFFSET_MINUTES }],
-  });
 }

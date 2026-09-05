@@ -2,9 +2,9 @@ import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { Fragment } from "react";
 import { Pressable, View } from "react-native";
 
+import { useTabActionValue, type TabAction } from "@/components/tab-action";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
-import { useTabActionValue, type TabAction } from "@/components/tab-action";
 import { Palette, Spacing } from "@/constants/theme";
 
 /**
@@ -96,35 +96,53 @@ export default function AppTabs() {
  * por colocación, y la documentación de Expo avisa de que el estado interno no
  * se comparte entre ellas. Leyéndola arriba, las dos dibujan lo mismo.
  *
- * Ocupa todo el accesorio en vez de ser un botón pequeño alineado a la derecha.
- * iOS le da al accesorio el ancho que le sobra a la barra, así que un botón
- * compacto dejaba una píldora blanca enorme y vacía con un círculo verde
- * colgando de la punta: parecía un fallo de maquetación, no una acción. Lleno,
- * se lee como el botón principal que es.
+ * Cada acción mide lo que ocupa su contenido y el grupo va centrado, en vez de
+ * repartirse el accesorio a partes iguales. Con dos acciones, repartir daba a
+ * "Compartir" media píldora de zona pulsable vacía a cada lado del texto, y el
+ * filete que las separa caía lejísimos de ambas etiquetas.
+ *
+ * El ancho de la píldora **no** se decide aquí: el accesorio lo dimensiona
+ * UIKit —todo el ancho de la barra desplegada, el sobrante cuando se encoge— y
+ * react-native-screens nos pasa ese marco ya hecho. Así que con una sola acción
+ * el cristal se seguirá viendo largo alrededor del botón; lo que se ajusta es
+ * el botón, no el vidrio.
  *
  * No dibuja cristal propio: el accesorio **ya es** una píldora de cristal, así
  * que meterle otra dentro con su relleno alrededor se veía como dos botones,
- * uno encajado en el otro. Aquí solo va el contenido —icono y etiqueta— y la
- * zona pulsable ocupa el accesorio entero.
+ * uno encajado en el otro. Aquí solo va el contenido —icono y etiqueta—.
  *
  * El acento se queda en el icono y el texto, no en el fondo. Este accesorio
  * aparece y desaparece al cambiar de pestaña, y una losa verde entrando de
  * golpe se leía como un parpadeo; en el material de la barra, la transición se
  * lee como que el cristal se alarga.
  *
- * Con la barra encogida se queda solo el icono, un poco mayor para que siga
- * siendo un objetivo cómodo sin la etiqueta al lado. Es lo que hace Mail: al
- * bajar, sus acciones se quedan en icono.
+ * La etiqueta se queda también con la barra encogida. Mail ahí deja solo el
+ * icono, pero Mail tiene una píldora ajustada a su contenido; aquí el cristal
+ * mide lo que UIKit quiera y un icono suelto en medio de tanto vidrio parecía
+ * un botón sin terminar. Con el nombre al lado, el mismo hueco se lee como un
+ * botón ancho y no como un error.
+ *
+ * Al encoger, la etiqueta baja a `caption` y el hueco se cierra: son los dos
+ * puntos donde se gana sitio sin tocar el icono, que es lo que se reconoce de
+ * lejos. Si aun así no cupiera —"Repartir otra vez" junto a "Compartir" en una
+ * pantalla estrecha—, el texto se corta con puntos suspensivos en vez de
+ * empujar al vecino fuera del cristal.
  */
 function ScreenActions({ actions }: { actions: TabAction[] }) {
-  // Con la barra desplegada el accesorio ocupa el ancho de la pantalla y cabe
-  // la etiqueta; encogido comparte fila con la tab bar y solo caben los
-  // iconos. Sin distinguirlo, "Repartir otra vez" salía cortado a media
-  // palabra —que es peor que no ponerlo—.
+  // Desplegado el accesorio ocupa el ancho de la pantalla; encogido comparte
+  // fila con la tab bar y queda bastante menos sitio. Lo que cambia es cuánto
+  // aire se le da a cada acción, no lo que enseña.
   const compact = NativeTabs.BottomAccessory.usePlacement() === "inline";
 
   return (
-    <View style={{ flex: 1, flexDirection: "row", alignItems: "stretch" }}>
+    <View
+      style={{
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "stretch",
+        justifyContent: "center",
+      }}
+    >
       {actions.map((action, index) => (
         <Fragment key={action.label}>
           {index === 0 ? null : (
@@ -160,25 +178,34 @@ function ScreenAction({
       disabled={action.disabled}
       onPress={action.onPress}
       style={({ pressed }) => ({
-        flex: 1,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
-        gap: Spacing.two,
+        // Encoge, no crece: el botón mide su contenido, y si dos etiquetas
+        // largas no cupieran, ceden en vez de desbordar el cristal.
+        flexShrink: 1,
+        gap: compact ? Spacing.one : Spacing.two,
+        // El relleno es la zona pulsable. Sin él, el objetivo sería el ancho
+        // exacto del icono —24 pt— y fallar el toque en una barra flotante es
+        // de las cosas que peor sientan.
+        paddingHorizontal: compact ? Spacing.two : Spacing.three,
         opacity: action.disabled ? 0.4 : pressed ? 0.6 : 1,
       })}
     >
       <Icon
         color={Palette.accent}
         name={action.icon}
-        size={compact ? 20 : 18}
+        size={18}
         strokeWidth={2}
       />
-      {compact ? null : (
-        <Text numberOfLines={1} tone="accent" variant="bodyStrong">
-          {action.label}
-        </Text>
-      )}
+      <Text
+        numberOfLines={1}
+        style={{ flexShrink: 1 }}
+        tone="accent"
+        variant={compact ? "caption" : "bodyStrong"}
+      >
+        {action.label}
+      </Text>
     </Pressable>
   );
 }

@@ -7,7 +7,8 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 
-import { Icon, type IconName } from "@/components/ui/icon";
+import { ColorIcon, type ColorIconName } from "@/components/ui/color-icon";
+import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { Palette, Spacing } from "@/constants/theme";
 import { API_URL } from "@/lib/api";
@@ -25,10 +26,13 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
  * resto en blanco, para señalar cuál acompañaba al banner. Salía caro por dos
  * lados: sobre el papel hueso, una ficha blanca con filete casi invisible se
  * lee como algo apagado —o desactivado— al lado de la verde, y aquí no hay
- * nada apagado: las cuatro son destinos a los que se puede ir. Ahora todas
- * llevan el verde rebajado detrás del icono, que es el mismo recurso que ya
- * usan las filas de ajustes y por la misma razón: sobre el papel a pelo, un
- * trazo de 1.8 se pierde.
+ * nada apagado: las cuatro son destinos a los que se puede ir.
+ *
+ * Los iconos van a color y la ficha, en cambio, se vuelve neutra. El verde
+ * rebajado del fondo estaba ahí para que un trazo de 1.8 no se perdiera sobre
+ * el papel; con cuatro dibujos macizos ese problema no existe, y un fondo
+ * teñido de verde se pelearía con el rojo del calendario y el naranja de la
+ * bombilla. Blanco con filete: la ficha se calla y el icono habla.
  *
  * El verde macizo se queda donde significa algo: el banner de la próxima reta,
  * que es el único bloque de acento de la app.
@@ -44,7 +48,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type Action = {
   key: string;
-  icon: IconName;
+  mark: ColorIconName;
   label: string;
   /** Ruta de la app, o camino de la web que se abre en el navegador. */
   href?: "/calendario" | "/reta";
@@ -62,13 +66,13 @@ const EXTERNAL_MARK = "rgba(0, 122, 85, 0.5)";
 const ACTIONS: Action[] = [
   {
     key: "calendario",
-    icon: "calendar",
+    mark: "calendar",
     label: "Calendario",
     href: "/calendario",
   },
-  { key: "once", icon: "ball", label: "Once ideal", href: "/reta" },
-  { key: "casacas", icon: "jersey", label: "Casacas", webPath: "/casacas" },
-  { key: "ideas", icon: "spark", label: "Ideas", webPath: "/ideas" },
+  { key: "once", mark: "pitch", label: "Once ideal", href: "/reta" },
+  { key: "casacas", mark: "jersey", label: "Casacas", webPath: "/casacas" },
+  { key: "ideas", mark: "bulb", label: "Ideas", webPath: "/ideas" },
 ];
 
 export function QuickActions() {
@@ -140,17 +144,12 @@ function ActionTile({
           borderCurve: "continuous",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: Palette.accentSoft,
+          backgroundColor: Palette.surface,
           borderWidth: 1,
-          borderColor: Palette.accentLine,
+          borderColor: Palette.line,
         }}
       >
-        <Icon
-          color={Palette.accent}
-          name={action.icon}
-          size={26}
-          strokeWidth={1.9}
-        />
+        <ColorIcon name={action.mark} size={30} />
 
         {/*
           La marca de salida va dentro de la ficha y no junto a la etiqueta: en

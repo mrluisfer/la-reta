@@ -128,6 +128,23 @@ export default function ConvocatoriaScreen() {
     );
   }
 
+  function renameGuest(id: number, name: string) {
+    const clean = name.trim();
+    if (clean.length === 0) return;
+
+    setGuests((previous) =>
+      reset(
+        previous.map((guest) =>
+          guest.id === id
+            ? // `displayName` en versales, igual que al crearlo: es lo que se
+              // lee en el tablero y en la ficha.
+              { ...guest, name: clean, displayName: clean.toUpperCase() }
+            : guest
+        )
+      )
+    );
+  }
+
   function removeGuest(id: number) {
     setGuests((previous) => previous.filter((guest) => guest.id !== id));
     setCalled((previous) => {
@@ -265,6 +282,7 @@ export default function ConvocatoriaScreen() {
               onAdd={addGuest}
               onRate={rateGuest}
               onRemove={removeGuest}
+              onRename={renameGuest}
             />
           </Section>
         </>

@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, ScrollView, View } from "react-native";
 import Animated, {
   interpolate,
@@ -251,8 +251,12 @@ export function PlayerSheet() {
           headerStyle,
         ]}
       >
+        {/* Destino del zoom desde la rejilla de Plantilla: la carta pequeña
+            crece exactamente hasta aquí. */}
         <Animated.View style={[{ width: CARD_WIDTH }, cardStyle]}>
-          <FifaCard player={player} size="hero" />
+          <Link.AppleZoomTarget>
+            <FifaCard player={player} size="hero" />
+          </Link.AppleZoomTarget>
         </Animated.View>
 
         <Animated.View

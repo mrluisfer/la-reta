@@ -3,10 +3,10 @@ import { RefreshControl, ScrollView, View } from "react-native";
 
 import { CrackCard } from "@/components/crack-card";
 import { GoalsTrend } from "@/components/goals-trend";
-import { MatchCard } from "@/components/match-card";
+import { MatchCard, MatchCardSkeleton } from "@/components/match-card";
 import { MatchdayBanner } from "@/components/matchday-banner";
 import { Notice } from "@/components/notice";
-import { PlayerRow } from "@/components/player-row";
+import { PlayerRow, PlayerRowSkeleton } from "@/components/player-row";
 import { QuickActions } from "@/components/quick-actions";
 import { ScorerRace, SCORER_RACE_SIZE } from "@/components/scorer-race";
 import { StatStrip } from "@/components/stat-strip";
@@ -47,9 +47,9 @@ const RANKING_SIZE = 5;
  */
 export default function InicioScreen() {
   const router = useRouter();
-  const { players, matches, summary, loading, error, refetch } = useReta();
+  const { players, matches, summary, loading, pending, error, refetch } =
+    useReta();
 
-  const pending = players === null;
   const ranking = players?.slice(0, RANKING_SIZE) ?? [];
   const lastMatch = matches?.[0] ?? null;
 
@@ -74,10 +74,15 @@ export default function InicioScreen() {
       refreshControl={
         <RefreshControl
           onRefresh={refetch}
-          refreshing={loading}
+          // Solo el refresco a mano gira: en la primera carga el sitio de cada
+          // dato ya está dibujado, y un indicador arriba del todo encima de
+          // eso es ruido que además empuja la pantalla.
+          refreshing={loading && !pending}
           tintColor={Palette.accent}
         />
       }
+      aria-busy={pending}
+      accessibilityLabel={pending ? "Cargando la portada…" : undefined}
     >
       <MatchdayBanner />
 
@@ -93,6 +98,12 @@ export default function InicioScreen() {
           title="No pudimos leer los datos de la reta"
         />
       )}
+
+      {pending ? (
+        <Section title="Último partido">
+          <MatchCardSkeleton />
+        </Section>
+      ) : null}
 
       {lastMatch === null ? null : (
         <Section
@@ -113,7 +124,7 @@ export default function InicioScreen() {
       )}
 
       <Section meta={`Top ${SCORER_RACE_SIZE}`} title="Goleadores">
-        <ScorerRace matches={matches} />
+        <ScorerRace matches={matches} pending={pending} />
       </Section>
 
       <Section meta="Mayor overall" title="El crack">
@@ -124,6 +135,16 @@ export default function InicioScreen() {
           player={summary.best}
         />
       </Section>
+
+      {pending ? (
+        <Section meta={`Top ${RANKING_SIZE}`} title="Ranking">
+          <View>
+            {Array.from({ length: RANKING_SIZE }, (_, index) => (
+              <PlayerRowSkeleton key={`fila-${index}`} />
+            ))}
+          </View>
+        </Section>
+      ) : null}
 
       {ranking.length === 0 ? null : (
         <Section meta={`Top ${ranking.length}`} title="Ranking">
@@ -140,8 +161,11 @@ export default function InicioScreen() {
         </Section>
       )}
 
-      <Section meta={`${matches?.length ?? 0} jornadas`} title="Goles por reta">
-        <GoalsTrend matches={matches} />
+      <Section
+        meta={pending ? undefined : `${matches?.length ?? 0} jornadas`}
+        title="Goles por reta"
+      >
+        <GoalsTrend matches={matches} pending={pending} />
       </Section>
     </ScrollView>
   );

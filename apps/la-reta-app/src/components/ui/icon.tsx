@@ -34,6 +34,12 @@ export type IconName =
   | "search"
   | "sliders"
   | "alphabet"
+  | "pencil"
+  | "trash"
+  | "refresh"
+  | "camera"
+  | "eye"
+  | "eye-off"
   | "pin";
 
 export type IconProps = {
@@ -67,6 +73,61 @@ export function Icon({
             {...stroke}
           />
           <Circle cx={12} cy={10.8} r={2.4} {...stroke} />
+        </>
+      ) : null}
+
+      {name === "eye" || name === "eye-off" ? (
+        <>
+          <Path
+            d="M2.2 12S6 5.6 12 5.6S21.8 12 21.8 12S18 18.4 12 18.4S2.2 12 2.2 12Z"
+            {...stroke}
+          />
+          <Circle cx={12} cy={12} r={3.2} {...stroke} />
+          {name === "eye-off" ? <Path d="M4 20 L20 4" {...stroke} /> : null}
+        </>
+      ) : null}
+
+      {name === "camera" ? (
+        <>
+          <Path d="M3 8.8h3.6l1.5-2.3h7.8l1.5 2.3H21v10.7H3z" {...stroke} />
+          <Circle cx={12} cy={14} r={3.6} {...stroke} />
+        </>
+      ) : null}
+
+      {name === "refresh" ? (
+        <>
+          {/* Flecha circular abierta con su punta maciza, como la de recargar
+              de iOS. El arco se corta arriba a la izquierda: ahí encaja la
+              punta, y cerrarlo del todo lo convertiría en un reloj. */}
+          <Path
+            d="M18.8 7.2 L17.8 6.1A9 9 0 1 0 20.5 15"
+            {...stroke}
+            strokeLinejoin="miter"
+          />
+          <Path
+            d="M21.8 4.6 V9.8 A0.75 0.75 0 0 1 21 10.5 H15.8 C15.1 10.5 14.8 9.7 15.3 9.2 L20.5 4.1 C21 3.6 21.8 3.9 21.8 4.6 Z"
+            fill={color}
+            stroke="none"
+          />
+        </>
+      ) : null}
+
+      {name === "trash" ? (
+        <>
+          {/* Tapa, cuerpo y dos ranuras: la papelera de siempre. */}
+          <Path d="M4 6.5 H20" {...stroke} />
+          <Path d="M9.5 6.5 V4.5 H14.5 V6.5" {...stroke} />
+          <Path d="M6.5 6.5 L7.4 19.5 H16.6 L17.5 6.5" {...stroke} />
+          <Path d="M10.2 10 V16" {...stroke} />
+          <Path d="M13.8 10 V16" {...stroke} />
+        </>
+      ) : null}
+
+      {name === "pencil" ? (
+        <>
+          {/* El lápiz de editar: cuerpo en diagonal y punta cerrada. */}
+          <Path d="M4 20 L4.8 16.2 L16 5 L19 8 L7.8 19.2 Z" {...stroke} />
+          <Path d="M14 7 L17 10" {...stroke} />
         </>
       ) : null}
 

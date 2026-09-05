@@ -17,6 +17,12 @@ import type { Player } from "@/lib/types";
  *
  * Tres columnas y no dos: con dos, diecinueve jugadores son diez filas y vuelve
  * a haber scroll para ver a quién falta; con cuatro, el nombre se parte.
+ *
+ * Dentro de la ficha manda el retrato. Con la cara a 44 pt sobraba papel por
+ * todos lados y quien busca a alguien acababa leyendo diecinueve nombres en
+ * gris; a 64 se reconoce a la gente de un vistazo, que es como se convoca de
+ * verdad. El nombre queda debajo, de pie de foto, y el relleno baja a lo justo
+ * para separar del filete.
  */
 
 const COLUMNS = 3;
@@ -29,6 +35,15 @@ const COLUMNS = 3;
  * como relleno dentro de cada celda, el ancho sigue siendo exacto.
  */
 const GUTTER = Spacing.two;
+
+/**
+ * Lado del retrato, en puntos. Es lo que llena la ficha: con tres columnas en
+ * un iPhone la celda mide unos 110, así que 64 deja el aire justo a los lados
+ * sin que la cara toque el filete.
+ */
+const AVATAR = 64;
+/** Chapa del check, proporcional al retrato. */
+const CHECK = 22;
 
 export function CallupGrid({
   players,
@@ -86,7 +101,7 @@ function CallupCard({
         style={{
           alignItems: "center",
           gap: Spacing.one,
-          paddingVertical: Spacing.three,
+          paddingVertical: Spacing.two,
           paddingHorizontal: Spacing.one,
           borderRadius: Radius.md,
           borderCurve: "continuous",
@@ -96,7 +111,7 @@ function CallupCard({
         }}
       >
         <View>
-          <PlayerAvatar player={player} size={44} />
+          <PlayerAvatar player={player} size={AVATAR} />
 
           {called ? (
             <View
@@ -104,8 +119,8 @@ function CallupCard({
                 position: "absolute",
                 right: -2,
                 bottom: -2,
-                width: 18,
-                height: 18,
+                width: CHECK,
+                height: CHECK,
                 borderRadius: Radius.pill,
                 backgroundColor: Palette.accent,
                 borderWidth: 2,
@@ -117,7 +132,7 @@ function CallupCard({
               <Icon
                 color={Palette.accentInk}
                 name="check"
-                size={10}
+                size={12}
                 strokeWidth={2.6}
               />
             </View>
@@ -126,7 +141,7 @@ function CallupCard({
 
         <Text
           numberOfLines={1}
-          style={{ maxWidth: "100%" }}
+          style={{ maxWidth: "100%", marginTop: Spacing.one }}
           tone={called ? "ink" : "muted"}
           variant="caption"
         >

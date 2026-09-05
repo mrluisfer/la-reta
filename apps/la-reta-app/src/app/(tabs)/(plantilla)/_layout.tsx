@@ -18,6 +18,19 @@ export default function PlantillaLayout() {
           primera fila se quedaba tapada y sobraba hueco abajo—. El título va
           dentro del contenido, que además es lo que hacen las hojas del
           sistema. */}
+      {/* Misma presentación que la hoja de orden: entra desde abajo, se cierra
+          con el gesto y deja la plantilla detrás — quien se registra no está
+          navegando a otro sitio, está rellenando algo encima de donde estaba. */}
+      <Stack.Screen
+        name="registro"
+        options={{
+          headerShown: false,
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+
       <Stack.Screen
         name="orden"
         options={{

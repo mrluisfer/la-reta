@@ -3,6 +3,7 @@ import { Pressable, View } from "react-native";
 import { MatchPhoto } from "@/components/match-photo";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { Icon } from "@/components/ui/icon";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Surface } from "@/components/ui/surface";
 import { Text } from "@/components/ui/text";
 import { Palette, Radius, Shadow, Spacing } from "@/constants/theme";
@@ -316,5 +317,44 @@ function ScorerChip({
         {scorer.goals > 1 ? ` ×${scorer.goals}` : ""}
       </Text>
     </View>
+  );
+}
+
+/**
+ * El hueco de una tarjeta de partido: fecha, marcador y una fila de
+ * goleadores. Se dibuja con el molde del duelo —el caso normal— porque hasta
+ * que llega el dato no se sabe cuántos equipos jugaron.
+ */
+export function MatchCardSkeleton({
+  showDate = false,
+}: {
+  showDate?: boolean;
+}) {
+  return (
+    <Surface padded={false} style={{ overflow: "hidden" }}>
+      <View style={{ gap: Spacing.three, padding: Spacing.four }}>
+        {showDate ? <Skeleton height={12} width={96} /> : null}
+
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: Spacing.three,
+          }}
+        >
+          <Skeleton height={20} width="28%" />
+          <Skeleton height={30} width={64} />
+          <Skeleton height={20} width="28%" />
+        </View>
+
+        <View style={{ height: 1, backgroundColor: Palette.hairline }} />
+
+        <View style={{ flexDirection: "row", gap: Spacing.two }}>
+          <Skeleton height={30} radius={Radius.pill} width={104} />
+          <Skeleton height={30} radius={Radius.pill} width={88} />
+        </View>
+      </View>
+    </Surface>
   );
 }
