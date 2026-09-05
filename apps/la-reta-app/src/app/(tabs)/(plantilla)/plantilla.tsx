@@ -1,9 +1,11 @@
-import { useRouter } from "expo-router";
-import { useDeferredValue, useMemo, useState } from "react";
+import { Link, useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
 
-import { FifaCard } from "@/components/fifa-card";
+import { FifaCard, FifaCardSkeleton } from "@/components/fifa-card";
 import { RosterControls } from "@/components/roster-controls";
+import { useTabAction } from "@/components/tab-action";
+import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/notice";
 import { Icon } from "@/components/ui/icon";
 import { Segmented } from "@/components/ui/segmented";
@@ -15,12 +17,20 @@ import {
   Spacing,
 } from "@/constants/theme";
 import { useReta } from "@/hooks/use-reta";
-import { GROUP_SHORT, playerGroups, type PositionGroup } from "@/lib/players";
+import {
+  GROUP_LABEL,
+  GROUP_SHORT,
+  playerGroups,
+  type PositionGroup,
+} from "@/lib/players";
 import { searchPlayers, sortPlayers } from "@/lib/roster";
 import { useRosterSort } from "@/lib/roster-sort";
-import type { Player } from "@/lib/types";
+import { loadOwnedPlayerId, loadSignupSent } from "@/lib/signup";
 
 type Filter = PositionGroup | "all";
+
+/** Cartas en hueco de la primera carga: dos columnas, tres filas. */
+const SKELETON_CARDS = Array.from({ length: 6 }, (_, i) => `hueco-${i}`);
 
 const GROUPS: PositionGroup[] = ["GK", "DEF", "MID", "FWD"];
 
@@ -42,8 +52,10 @@ const GROUPS: PositionGroup[] = ["GK", "DEF", "MID", "FWD"];
  */
 export default function PlantillaScreen() {
   const router = useRouter();
-  const { players, loading, error, refetch } = useReta();
+  const { players, loading, pending, error, refetch } = useReta();
   const [filter, setFilter] = useState<Filter>("all");
+  const [signupSent, setSignupSent] = useState(false);
+  const [hasCard, setHasCard] = useState(false);
   const [query, setQuery] = useState("");
   // El orden vive fuera del componente porque quien lo cambia es la hoja, que
   // es otra ruta y no puede devolver un valor al volver.
@@ -55,6 +67,46 @@ export default function PlantillaScreen() {
   // bloquee la siguiente tecla. Un `setTimeout` fijo añadiría espera aunque
   // sobre tiempo — esto solo se retrasa cuando de verdad va justo.
   const search = useDeferredValue(query);
+
+  // Se relee al enfocar y no solo al montar: las pestañas nativas mantienen la
+  // pantalla viva, así que al volver de la hoja el montaje ya pasó hace rato.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      Promise.all([loadOwnedPlayerId(), loadSignupSent()]).then(
+        ([playerId, sent]) => {
+          if (!alive) return;
+          setHasCard(playerId !== null);
+          setSignupSent(sent !== null);
+        }
+      );
+      return () => {
+        alive = false;
+      };
+    }, [])
+  );
+
+  // La acción de la pantalla va al cristal de la barra, como "Convocar" en
+  // Armar. Es lo que ya hace la app con la acción principal de cada vista, está
+  // donde el pulgar ya estaba y no tapa cartas — un botón flotante propio se
+  // pelearía con esa misma esquina.
+  //
+  // Con ficha propia la acción **desaparece**: ofrecerle registrarse a quien ya
+  // está en la lista es preguntarle si existe. Con la solicitud mandada se
+  // queda, pero apagada: quitarla dejaría a alguien tocando donde antes había
+  // algo, y dejarla viva llenaría la cola de duplicados del mismo.
+  useTabAction(
+    hasCard
+      ? []
+      : [
+          {
+            label: signupSent ? "Solicitud enviada" : "No estoy",
+            icon: "person",
+            disabled: signupSent,
+            onPress: () => router.push("/registro"),
+          },
+        ]
+  );
 
   const options = useMemo(() => {
     const counts = new Map<PositionGroup, number>();
@@ -73,6 +125,9 @@ export default function PlantillaScreen() {
         (group) => ({
           value: group,
           label: GROUP_SHORT[group],
+          // "MED" no se entiende solo; el nombre entero sale al mantener
+          // pulsada la cápsula.
+          hint: GROUP_LABEL[group],
           count: counts.get(group) ?? 0,
         })
       ),
@@ -95,14 +150,6 @@ export default function PlantillaScreen() {
     return list.length % 2 === 1 ? [...list, null] : list;
   }, [players, filter, search, sort]);
 
-  // Forma con `pathname` + `params`: las rutas tipadas validan el patrón, y
-  // una plantilla de cadena con el id numérico no encaja en ese tipo.
-  const open = (player: Player) =>
-    router.push({
-      pathname: "/jugador/[id]",
-      params: { id: String(player.id) },
-    });
-
   return (
     <FlatList
       columnWrapperStyle={{ gap: Spacing.three }}
@@ -114,13 +161,32 @@ export default function PlantillaScreen() {
         paddingHorizontal: Spacing.four,
         paddingBottom: BottomTabInset + Spacing.five,
       }}
+      aria-busy={pending}
       contentInsetAdjustmentBehavior="automatic"
       data={visible}
       keyExtractor={(player, index) =>
         player?.id.toString() ?? `hueco-${index}`
       }
       ListEmptyComponent={
-        loading ? null : (
+        // En la primera carga la rejilla se dibuja en hueco: decir "no hay
+        // jugadores en esta línea" antes de haber preguntado es mentir.
+        pending ? (
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: Spacing.three,
+            }}
+          >
+            {SKELETON_CARDS.map((key) => (
+              // `flexBasis` corto más `flexGrow` reparte el sobrante: dos por
+              // fila con el mismo hueco que usa `columnWrapperStyle`.
+              <View key={key} style={{ flexBasis: "45%", flexGrow: 1 }}>
+                <FifaCardSkeleton />
+              </View>
+            ))}
+          </View>
+        ) : loading ? null : (
           <View
             style={{
               paddingVertical: Spacing.six,
@@ -134,6 +200,19 @@ export default function PlantillaScreen() {
                 ? `Nadie coincide con “${query.trim()}”.`
                 : "No hay jugadores en esta línea."}
             </Text>
+
+            {/* Buscarse y no salir es el momento exacto en que alguien
+                descubre que no está. Sin esto, el estado vacío es un
+                callejón. */}
+            {query.trim().length === 0 || signupSent || hasCard ? null : (
+              <Button
+                icon="person"
+                label="No estoy en la plantilla"
+                onPress={() => router.push("/registro")}
+                size="md"
+                variant="ghost"
+              />
+            )}
           </View>
         )
       }
@@ -155,14 +234,35 @@ export default function PlantillaScreen() {
       refreshControl={
         <RefreshControl
           onRefresh={refetch}
-          refreshing={loading}
+          // La primera carga la cuenta la rejilla en hueco; el indicador de
+          // arriba queda para el refresco a mano.
+          refreshing={loading && !pending}
           tintColor={Palette.accent}
         />
       }
       renderItem={({ item }) => (
         <View style={{ flex: 1 }}>
           {item === null ? null : (
-            <FifaCard onPress={() => open(item)} player={item} />
+            // La carta abre la ficha con la transición de zoom de iOS 18: se
+            // agranda hasta ocupar el sitio de la carta grande de la ficha en
+            // vez de entrar deslizándose desde el borde. Necesita un `Link`
+            // (el `router.push` de antes no puede marcar el origen) y sigue
+            // navegando igual donde la transición no exista.
+            //
+            // Forma con `pathname` + `params`: las rutas tipadas validan el
+            // patrón, y una plantilla de cadena con el id numérico no encaja
+            // en ese tipo.
+            <Link
+              asChild
+              href={{
+                pathname: "/jugador/[id]",
+                params: { id: String(item.id) },
+              }}
+            >
+              <Link.AppleZoom>
+                <FifaCard player={item} />
+              </Link.AppleZoom>
+            </Link>
           )}
         </View>
       )}

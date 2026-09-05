@@ -7,15 +7,15 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { Icon, type IconName } from "@/components/ui/icon";
+import { ColorIcon, type ColorIconName } from "@/components/ui/color-icon";
 import { Text } from "@/components/ui/text";
-import { Motion, Palette, Radius, Spacing, type Tone } from "@/constants/theme";
+import { Motion, Spacing, type Tone } from "@/constants/theme";
 
 export type FigureProps = {
   value: number | string | null;
   label: string;
   /** Distintivo sobre la cifra. Ayuda a distinguir columnas de un vistazo. */
-  icon?: IconName;
+  icon?: ColorIconName;
   tone?: Tone;
   align?: "left" | "center" | "right";
 };
@@ -28,6 +28,11 @@ export type FigureProps = {
  * La entrada se hace con un estilo animado y no con las animaciones de layout
  * de Reanimated (`entering`): en web esas envuelven el elemento en una capa
  * posicionada y la cifra se salía de su celda, encima de la etiqueta.
+ *
+ * El icono va suelto, sin la chapa verde que llevaba antes: ahora es un dibujo
+ * a color y meterlo en un cuadrado teñido le ponía un marco que se peleaba con
+ * él. Sin chapa, además, las tres piezas —icono, cifra y etiqueta— comparten
+ * ancho óptico y el ojo baja en línea recta.
  */
 export function Figure({
   value,
@@ -57,19 +62,8 @@ export function Figure({
   return (
     <View style={{ gap: Spacing.one, alignItems: alignmentOf(align) }}>
       {icon ? (
-        <View
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: Radius.sm,
-            borderCurve: "continuous",
-            backgroundColor: Palette.accentSoft,
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: Spacing.half,
-          }}
-        >
-          <Icon color={Palette.accent} name={icon} size={15} />
+        <View style={{ marginBottom: Spacing.half }}>
+          <ColorIcon name={icon} size={24} />
         </View>
       ) : null}
 

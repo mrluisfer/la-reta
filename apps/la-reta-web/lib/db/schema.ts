@@ -1,14 +1,4 @@
 import {
-  FEET,
-  IDEA_CATEGORIES,
-  IDEA_PRIORITIES,
-  IDEA_STATUSES,
-  POSITIONS,
-  REPORT_CATEGORIES,
-  REPORT_STATUSES,
-  SIGNUP_STATUSES,
-} from "@/lib/constants";
-import {
   boolean,
   date,
   index,
@@ -24,6 +14,16 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
+import {
+  FEET,
+  IDEA_CATEGORIES,
+  IDEA_PRIORITIES,
+  IDEA_STATUSES,
+  POSITIONS,
+  REPORT_CATEGORIES,
+  REPORT_STATUSES,
+  SIGNUP_STATUSES,
+} from "@/lib/constants";
 
 /**
  * Specific on-pitch position, FIFA style (GK, CB, CM, ST, ...).
@@ -167,17 +167,21 @@ export const generatedRetas = pgTable(
      */
     teams:
       jsonb("teams").$type<{ key: string; name: string; rating: number }[]>(),
-    /** Spread entre el equipo más fuerte y el más débil. */
+    /**
+    Spread entre el equipo más fuerte y el más débil.
+    */
     diff: real("diff").notNull().default(0),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (t) => [index("generated_retas_signature_idx").on(t.signature)],
+  (t) => [index("generated_retas_signature_idx").on(t.signature)]
 );
 
 export type GeneratedReta = typeof generatedRetas.$inferSelect;
 export type NewGeneratedReta = typeof generatedRetas.$inferInsert;
 
-/** A player's assignment inside a generated reta (side, role, OVR snapshot). */
+/**
+A player's assignment inside a generated reta (side, role, OVR snapshot).
+*/
 export const generatedRetaPlayers = pgTable("generated_reta_players", {
   id: serial("id").primaryKey(),
   retaId: integer("reta_id")
@@ -236,7 +240,7 @@ export const matches = pgTable("matches", {
   // Which generated lineup this match came from (null for manual entries).
   generatedRetaId: integer("generated_reta_id").references(
     () => generatedRetas.id,
-    { onDelete: "set null" },
+    { onDelete: "set null" }
   ),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -270,7 +274,9 @@ export type MatchGoal = typeof matchGoals.$inferSelect;
 export type NewMatchGoal = typeof matchGoals.$inferInsert;
 
 // Match awards (votación post-partido)
-/** Premios que se votan por partido: mejor gol, peor error y figura (MVP). */
+/**
+Premios que se votan por partido: mejor gol, peor error y figura (MVP).
+*/
 export const voteCategoryEnum = pgEnum("vote_category", [
   "gol",
   "error",
@@ -299,20 +305,27 @@ export const matchVotes = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
+  // Las dos reglas de estilo de flecha se contradicen aquí: sin bloque,
+  // `consistent-arrow-return-style` pide un `return` explícito por ser
+  // multilínea; con bloque, `arrow-body-style` pide quitarlo. La lista no cabe
+  // en una línea, así que no hay forma de contentar a las dos.
+  // eslint-disable-next-line unicorn/consistent-arrow-return-style
   (t) => [
     uniqueIndex("match_votes_voter_unique").on(
       t.matchId,
       t.category,
-      t.voterId,
+      t.voterId
     ),
-  ],
+  ]
 );
 
 export type MatchVote = typeof matchVotes.$inferSelect;
 export type NewMatchVote = typeof matchVotes.$inferInsert;
 
 // Reta words (community banner)
-/** Words people contribute to fill "La Reta ____", with light client context. */
+/**
+Words people contribute to fill "La Reta ____", with light client context.
+*/
 export const retaWords = pgTable("reta_words", {
   id: serial("id").primaryKey(),
   word: varchar("word", { length: 40 }).notNull(),
@@ -329,7 +342,9 @@ export type RetaWord = typeof retaWords.$inferSelect;
 export type NewRetaWord = typeof retaWords.$inferInsert;
 
 // Player comments
-/** Open comments on a player, with light client context. */
+/**
+Open comments on a player, with light client context.
+*/
 export const playerComments = pgTable("player_comments", {
   id: serial("id").primaryKey(),
   playerId: integer("player_id")
@@ -373,20 +388,24 @@ export const commentReactions = pgTable(
     reactorKey: varchar("reactor_key", { length: 64 }).notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
+  // Mismo empate entre reglas que en `match_votes`.
+  // eslint-disable-next-line unicorn/consistent-arrow-return-style
   (t) => [
     uniqueIndex("comment_reactions_unique").on(
       t.commentId,
       t.emoji,
-      t.reactorKey,
+      t.reactorKey
     ),
-  ],
+  ]
 );
 
 export type CommentReaction = typeof commentReactions.$inferSelect;
 export type NewCommentReaction = typeof commentReactions.$inferInsert;
 
 // Legal consent evidence
-/** Minimal audit trail for users who accept the public legal documents. */
+/**
+Minimal audit trail for users who accept the public legal documents.
+*/
 export const legalAcceptances = pgTable("legal_acceptances", {
   id: serial("id").primaryKey(),
   legalVersion: varchar("legal_version", { length: 40 }).notNull(),
@@ -472,6 +491,11 @@ export const playerSignups = pgTable("player_signups", {
   // How to reach them + anything they want to add.
   contact: varchar("contact", { length: 160 }),
   note: text("note"),
+  // Cuenta de Clerk que mandó la solicitud, cuando llega desde la app (donde
+  // hay sesión obligatoria). El formulario público de la web la deja en null.
+  // Es lo que permite que al aprobarla la ficha nazca ya vinculada a su dueño
+  // en vez de tener que reclamarla después a mano.
+  clerkUserId: text("clerk_user_id"),
   status: signupStatusEnum("status").notNull().default("pendiente"),
   adminNotes: text("admin_notes"),
   // Light client context (same shape as reports).

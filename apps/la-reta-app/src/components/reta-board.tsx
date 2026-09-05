@@ -11,7 +11,8 @@ import {
 } from "react-native";
 
 import { PitchLineup } from "@/components/pitch-lineup";
-import { TeamNameDialog } from "@/components/team-name-dialog";
+import { NameDialog } from "@/components/name-dialog";
+import { MAX_TEAM_NAME } from "@/lib/team-names";
 import { Text } from "@/components/ui/text";
 import { Display, Palette, Radius, Spacing } from "@/constants/theme";
 import { teamSlots } from "@/lib/lineup";
@@ -124,11 +125,13 @@ export function RetaBoard({
       </View>
 
       {editing ? (
-        <TeamNameDialog
+        <NameDialog
           current={
             nameOf(editing) === defaultTeamName(editing) ? "" : nameOf(editing)
           }
           key={editing}
+          label="Nombre del equipo"
+          maxLength={MAX_TEAM_NAME}
           onClose={() => setEditing(null)}
           onSave={(value) => onRename(editing, value)}
           placeholder={defaultTeamName(editing)}

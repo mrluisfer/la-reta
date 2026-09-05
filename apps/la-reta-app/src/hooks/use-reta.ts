@@ -8,7 +8,10 @@ export interface RetaState {
   players: Player[] | null;
   matches: Match[] | null;
   summary: RetaSummary;
+  /** Hay una petición en vuelo. Con `pending` en falso es un refresco. */
   loading: boolean;
+  /** Primera carga: no hay nada que enseñar todavía, toca el esqueleto. */
+  pending: boolean;
   error: string | null;
   refetch: () => void;
 }
@@ -25,6 +28,7 @@ export function useReta(): RetaState {
     data: players,
     error: playersError,
     loading: playersLoading,
+    pending: playersPending,
     refetch: refetchPlayers,
   } = useApi<Player[]>("/api/v1/players");
 
@@ -32,6 +36,7 @@ export function useReta(): RetaState {
     data: matches,
     error: matchesError,
     loading: matchesLoading,
+    pending: matchesPending,
     refetch: refetchMatches,
   } = useApi<Match[]>("/api/v1/matches");
 
@@ -50,6 +55,9 @@ export function useReta(): RetaState {
     matches,
     summary,
     loading: playersLoading || matchesLoading,
+    // Basta con que una de las dos siga en blanco: media pantalla con datos y
+    // media con avisos de "no hay nada" cuenta algo que aún no se sabe.
+    pending: playersPending || matchesPending,
     // Si las dos fallan es por lo mismo (no hay backend), así que basta con
     // enseñar el primer error en vez de apilar dos avisos iguales.
     error: playersError ?? matchesError,

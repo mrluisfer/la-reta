@@ -1,4 +1,5 @@
 import * as Haptics from "expo-haptics";
+import type { ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -34,6 +35,12 @@ export type ButtonProps = {
    * leerse, que es lo que hace que el pulgar no dude.
    */
   icon?: IconName;
+  /**
+   * Un icono propio en lugar del de línea, para los botones que comparten
+   * destino con otra parte de la app y tienen que verse iguales. Manda sobre
+   * `icon`: si vienen los dos, se dibuja este.
+   */
+  mark?: ReactNode;
   /** Reparte el ancho cuando varios botones comparten una fila. */
   flex?: number;
   style?: ViewStyle;
@@ -57,6 +64,7 @@ export function Button({
   disabled = false,
   loading = false,
   icon,
+  mark,
   flex,
   style,
 }: ButtonProps) {
@@ -104,7 +112,10 @@ export function Button({
         opacity: loading ? 0 : 1,
       }}
     >
-      {icon ? <Icon color={Tones[tone]} name={icon} size={iconSize} /> : null}
+      {mark ??
+        (icon ? (
+          <Icon color={Tones[tone]} name={icon} size={iconSize} />
+        ) : null)}
       <Text
         numberOfLines={1}
         style={{ letterSpacing: -0.2 }}
@@ -139,7 +150,10 @@ export function Button({
   const shape: ViewStyle = {
     borderRadius: Radius.pill,
     overflow: "hidden",
-    opacity: inert ? 0.45 : 1,
+    // El cristal no tiene relleno propio: apagarlo tanto como a un botón
+    // sólido lo deja casi invisible sobre el papel. Se apaga menos, que basta
+    // para que se lea como inactivo sin que desaparezca.
+    opacity: inert ? (variant === "glass" ? 0.65 : 0.45) : 1,
   };
 
   return (

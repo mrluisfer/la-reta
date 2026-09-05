@@ -1,6 +1,7 @@
 import { View } from "react-native";
 import { CartesianChart, HorizontalBar } from "victory-native";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
 import { Motion, Palette } from "@/constants/theme";
 import { useChartFont } from "@/hooks/use-chart-font";
@@ -27,9 +28,20 @@ const AXIS_HEIGHT = 26;
  * la distancia: una lista "8, 7, 6" y otra "8, 3, 1" se leen igual en texto y
  * cuentan campeonatos muy distintos.
  */
-export function ScorerRace({ matches }: { matches: Match[] | null }) {
+export function ScorerRace({
+  matches,
+  pending = false,
+}: {
+  matches: Match[] | null;
+  /** Primera carga: sin esto la gráfica vacía diría que no hay goles. */
+  pending?: boolean;
+}) {
   const data = topScorers(matches, SCORER_RACE_SIZE);
   const font = useChartFont(11);
+
+  if (pending) {
+    return <ScorerRaceSkeleton />;
+  }
 
   if (data.length === 0) {
     return (
@@ -74,6 +86,27 @@ export function ScorerRace({ matches }: { matches: Match[] | null }) {
           />
         )}
       </CartesianChart>
+    </View>
+  );
+}
+
+/** Las barras que van a salir, en el mismo alto y con la caída de una tabla real. */
+const SKELETON_WIDTHS = ["86%", "68%", "54%", "42%", "30%"] as const;
+
+function ScorerRaceSkeleton() {
+  return (
+    <View style={{ height: SCORER_RACE_SIZE * ROW_HEIGHT + AXIS_HEIGHT }}>
+      {SKELETON_WIDTHS.map((width) => (
+        <View
+          key={width}
+          style={{
+            height: ROW_HEIGHT,
+            justifyContent: "center",
+          }}
+        >
+          <Skeleton height={18} width={width} />
+        </View>
+      ))}
     </View>
   );
 }

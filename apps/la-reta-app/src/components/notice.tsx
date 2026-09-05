@@ -41,6 +41,7 @@ export function Notice({ title, detail, actionLabel, onAction }: NoticeProps) {
 
       {actionLabel && onAction ? (
         <Button
+          icon="refresh"
           label={actionLabel}
           onPress={onAction}
           size="md"

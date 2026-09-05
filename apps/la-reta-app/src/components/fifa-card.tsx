@@ -7,6 +7,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
 import { Display, Radius, Shadow, Spacing } from "@/constants/theme";
 import { initials, photoSource } from "@/lib/photos";
@@ -292,3 +293,12 @@ const styles = StyleSheet.create({
     gap: 1,
   },
 });
+
+/** El hueco de una carta, con su misma proporción para que la rejilla no salte. */
+export function FifaCardSkeleton({ size = "grid" }: { size?: Size }) {
+  return (
+    <View style={{ aspectRatio: 7 / 10 }}>
+      <Skeleton height="100%" radius={SIZES[size].radius} />
+    </View>
+  );
+}

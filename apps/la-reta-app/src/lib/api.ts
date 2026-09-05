@@ -61,7 +61,7 @@ export async function clearPinToken(): Promise<void> {
   await SecureStore.deleteItemAsync(PIN_TOKEN_KEY);
 }
 
-async function authHeaders(): Promise<Record<string, string>> {
+export async function authHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
 
   const session = await getSessionToken?.();

@@ -2,9 +2,10 @@ import { Pressable, View } from "react-native";
 
 import { PlayerAvatar } from "@/components/player-avatar";
 import { Icon } from "@/components/ui/icon";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Surface } from "@/components/ui/surface";
 import { Text } from "@/components/ui/text";
-import { Palette, Radius, Spacing } from "@/constants/theme";
+import { Palette, Spacing } from "@/constants/theme";
 import { formatPositions } from "@/lib/players";
 import { STAT_ABBR, STAT_KEYS, type Player } from "@/lib/types";
 
@@ -97,34 +98,21 @@ function CrackSkeleton() {
           gap: Spacing.three,
         }}
       >
-        <Block height={54} width={54} />
+        <Skeleton height={54} width={54} />
         <View style={{ flex: 1, gap: Spacing.two }}>
-          <Block height={22} width="62%" />
-          <Block height={13} width="40%" />
+          <Skeleton height={22} width="62%" />
+          <Skeleton height={13} width="40%" />
         </View>
-        <Block height={34} width={54} />
+        <Skeleton height={34} width={54} />
       </View>
       <View style={{ height: 1, backgroundColor: Palette.hairline }} />
       <View style={{ flexDirection: "row", gap: Spacing.two }}>
         {STAT_KEYS.map((key) => (
           <View key={key} style={{ flex: 1, alignItems: "center" }}>
-            <Block height={20} width="70%" />
+            <Skeleton height={20} width="70%" />
           </View>
         ))}
       </View>
     </Surface>
-  );
-}
-
-function Block({ height, width }: { height: number; width: number | string }) {
-  return (
-    <View
-      style={{
-        height,
-        width: width as number,
-        borderRadius: Radius.sm,
-        backgroundColor: Palette.surfaceSunken,
-      }}
-    />
   );
 }

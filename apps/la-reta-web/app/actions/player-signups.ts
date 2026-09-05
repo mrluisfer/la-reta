@@ -1,22 +1,18 @@
 "use server";
 
-import { isAdmin } from "@/lib/admin";
-import {
-  FEET,
-  POSITIONS,
-  SIGNUP_STATUSES,
-  type Foot,
-  type Position,
-  type SignupStatus,
-} from "@/lib/constants";
-import { db, playerSignups } from "@/lib/db";
+import { cleanPersonName, personNameError } from "@repo/reta/names";
+
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import type { Foot, SignupStatus } from "@/lib/constants";
+import { isAdmin } from "@/lib/admin";
+import { FEET, POSITIONS, SIGNUP_STATUSES } from "@/lib/constants";
+import { db, playerSignups } from "@/lib/db";
 
 type Result = { ok: true; id?: number } | { ok: false; error: string };
 
-export type SignupClientInfo = {
+export interface SignupClientInfo {
   language?: string;
   languages?: string;
   timezone?: string;
@@ -26,9 +22,9 @@ export type SignupClientInfo = {
   pixelRatio?: string;
   platform?: string;
   userAgent?: string;
-};
+}
 
-export type PlayerSignupInput = {
+export interface PlayerSignupInput {
   name: string;
   displayName?: string;
   position: string;
@@ -41,108 +37,37 @@ export type PlayerSignupInput = {
   weightKg?: string | number;
   contact?: string;
   note?: string;
+  /**
+  Cuenta de Clerk de quien la manda, si la petición venía con sesión.
+  */
+  clerkUserId?: string | null;
   client?: SignupClientInfo;
-};
+}
 
 const inList = <T extends readonly string[]>(
   list: T,
-  value: string | undefined,
-): value is T[number] => !!value && list.includes(value);
+  value: string | undefined
+): value is T[number] => value !== undefined && list.includes(value);
 
 const smallintOrNull = (value: string | number | undefined) => {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
 };
 
-export async function createPlayerSignup(
-  input: PlayerSignupInput,
-): Promise<Result> {
-  const name = input.name?.trim();
-  if (!name) return { ok: false, error: "Tu nombre es obligatorio." };
-  if (!inList(POSITIONS, input.position)) {
-    return { ok: false, error: "Elige una posición." };
-  }
+/**
+Rutas que se revalidan al tocar la cola de solicitudes.
+*/
+const ADMIN_PATH = "/admin/registros";
+const PLAYERS_PATH = "/players";
 
-  const position = input.position as Position;
-  const position2 =
-    inList(POSITIONS, input.position2) && input.position2 !== position
-      ? (input.position2 as Position)
-      : null;
-  const preferredFoot: Foot = inList(FEET, input.preferredFoot)
-    ? (input.preferredFoot as Foot)
-    : "right";
-
-  const requestInfo = await collectRequestInfo();
-
-  const [row] = await db
-    .insert(playerSignups)
-    .values({
-      name: name.slice(0, 120),
-      displayName: input.displayName?.trim().slice(0, 60) || null,
-      position,
-      position2,
-      preferredFoot,
-      nationality: (input.nationality?.trim().toLowerCase() || "mx").slice(
-        0,
-        2,
-      ),
-      photoUrl: input.photoUrl?.trim().slice(0, 500) || null,
-      birthDate: input.birthDate?.trim() || null,
-      heightCm: smallintOrNull(input.heightCm),
-      weightKg: smallintOrNull(input.weightKg),
-      contact: input.contact?.trim().slice(0, 160) || null,
-      note: input.note?.trim() || null,
-      language: safeText(input.client?.language, 24),
-      languages: safeText(input.client?.languages, 240),
-      timezone: safeText(input.client?.timezone, 64),
-      timezoneOffset:
-        typeof input.client?.timezoneOffset === "number"
-          ? input.client.timezoneOffset
-          : null,
-      screen: safeText(input.client?.screen, 32),
-      viewport: safeText(input.client?.viewport, 32),
-      pixelRatio: safeText(input.client?.pixelRatio, 16),
-      platform: safeText(input.client?.platform, 80),
-      userAgent: input.client?.userAgent || null,
-      ...requestInfo,
-    })
-    .returning({ id: playerSignups.id });
-
-  revalidatePath("/admin/registros");
-  revalidatePath("/players");
-  return { ok: true, id: row.id };
-}
-
-export async function updateSignupStatus(
-  id: number,
-  status: string,
-  adminNotes?: string,
-): Promise<Result> {
-  if (!(await isAdmin())) return { ok: false, error: "No autorizado." };
-  const next: SignupStatus = SIGNUP_STATUSES.includes(status as SignupStatus)
-    ? (status as SignupStatus)
-    : "pendiente";
-
-  await db
-    .update(playerSignups)
-    .set({
-      status: next,
-      adminNotes: adminNotes?.trim() || null,
-      updatedAt: new Date(),
-    })
-    .where(eq(playerSignups.id, id));
-
-  revalidatePath("/admin/registros");
-  revalidatePath("/players");
-  return { ok: true, id };
-}
-
-export async function deleteSignup(id: number): Promise<Result> {
-  if (!(await isAdmin())) return { ok: false, error: "No autorizado." };
-  await db.delete(playerSignups).where(eq(playerSignups.id, id));
-  revalidatePath("/admin/registros");
-  revalidatePath("/players");
-  return { ok: true, id };
+/**
+Recorta y acota; vacío cuenta como ausente, que es lo que guarda la tabla.
+*/
+function safeText(value: string | null | undefined, maxLength: number) {
+  const clean = value?.trim();
+  return clean === undefined || clean.length === 0
+    ? null
+    : clean.slice(0, maxLength);
 }
 
 async function collectRequestInfo() {
@@ -153,13 +78,13 @@ async function collectRequestInfo() {
     ipAddress: safeText(
       headerStore.get("cf-connecting-ip") ??
         headerStore.get("x-real-ip") ??
-        forwardedFor?.split(",")[0]?.trim(),
-      64,
+        forwardedFor?.split(",", 1)[0]?.trim(),
+      64
     ),
     forwardedFor: safeText(forwardedFor, 500),
     country: safeText(
       headerStore.get("cf-ipcountry") ?? headerStore.get("x-vercel-ip-country"),
-      8,
+      8
     ),
     region: safeText(headerStore.get("x-vercel-ip-country-region"), 120),
     city: safeText(headerStore.get("x-vercel-ip-city"), 120),
@@ -169,7 +94,109 @@ async function collectRequestInfo() {
   };
 }
 
-function safeText(value: string | null | undefined, maxLength: number) {
-  const clean = value?.trim();
-  return clean ? clean.slice(0, maxLength) : null;
+/**
+ * El rastro del cliente que manda la solicitud. Sale de `createPlayerSignup`
+ * para que ese siga contando lo que hace —validar y guardar— y no doce líneas
+ * de copiar campos con su tope de caracteres.
+ */
+function clientColumns(client: SignupClientInfo | undefined) {
+  return {
+    language: safeText(client?.language, 24),
+    languages: safeText(client?.languages, 240),
+    timezone: safeText(client?.timezone, 64),
+    timezoneOffset:
+      typeof client?.timezoneOffset === "number" ? client.timezoneOffset : null,
+    screen: safeText(client?.screen, 32),
+    viewport: safeText(client?.viewport, 32),
+    pixelRatio: safeText(client?.pixelRatio, 16),
+    platform: safeText(client?.platform, 80),
+    userAgent: client?.userAgent ?? null,
+  };
+}
+
+export async function createPlayerSignup(
+  input: PlayerSignupInput
+): Promise<Result> {
+  // La misma regla que aplica la app mientras se escribe. Aquí no es cortesía:
+  // el cliente es sugerencia, esto es la puerta.
+  const name = cleanPersonName(input.name);
+  const nameError = personNameError(name);
+  if (nameError !== null) {
+    return { ok: false, error: nameError };
+  }
+  if (!inList(POSITIONS, input.position)) {
+    return { ok: false, error: "Elige una posición." };
+  }
+
+  const { position } = input;
+  const position2 =
+    inList(POSITIONS, input.position2) && input.position2 !== position
+      ? input.position2
+      : null;
+  const preferredFoot: Foot = inList(FEET, input.preferredFoot)
+    ? input.preferredFoot
+    : "right";
+
+  const requestInfo = await collectRequestInfo();
+
+  const [row] = await db
+    .insert(playerSignups)
+    .values({
+      name: name.slice(0, 120),
+      displayName: safeText(cleanPersonName(input.displayName ?? ""), 60),
+      position,
+      position2,
+      preferredFoot,
+      nationality: safeText(input.nationality?.toLowerCase(), 2) ?? "mx",
+      photoUrl: safeText(input.photoUrl, 500),
+      birthDate: safeText(input.birthDate, 10),
+      heightCm: smallintOrNull(input.heightCm),
+      weightKg: smallintOrNull(input.weightKg),
+      contact: safeText(input.contact, 160),
+      note: safeText(input.note, 2000),
+      clerkUserId: safeText(input.clerkUserId, 120),
+      ...clientColumns(input.client),
+      ...requestInfo,
+    })
+    .returning({ id: playerSignups.id });
+
+  revalidatePath(ADMIN_PATH);
+  revalidatePath(PLAYERS_PATH);
+  return { ok: true, id: row.id };
+}
+
+export async function updateSignupStatus(
+  id: number,
+  status: string,
+  adminNotes?: string
+): Promise<Result> {
+  if (!(await isAdmin())) {
+    return { ok: false, error: "No autorizado." };
+  }
+  const next: SignupStatus = inList(SIGNUP_STATUSES, status)
+    ? status
+    : "pendiente";
+
+  await db
+    .update(playerSignups)
+    .set({
+      status: next,
+      adminNotes: safeText(adminNotes, 2000),
+      updatedAt: new Date(),
+    })
+    .where(eq(playerSignups.id, id));
+
+  revalidatePath(ADMIN_PATH);
+  revalidatePath(PLAYERS_PATH);
+  return { ok: true, id };
+}
+
+export async function deleteSignup(id: number): Promise<Result> {
+  if (!(await isAdmin())) {
+    return { ok: false, error: "No autorizado." };
+  }
+  await db.delete(playerSignups).where(eq(playerSignups.id, id));
+  revalidatePath(ADMIN_PATH);
+  revalidatePath(PLAYERS_PATH);
+  return { ok: true, id };
 }

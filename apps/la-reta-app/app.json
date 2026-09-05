@@ -48,6 +48,12 @@
           "writeOnlyAccess": true,
           "writeOnlyCalendarPermission": "La Reta añade la fecha de la próxima reta a tu calendario."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "La Reta usa tu galería para la foto de tu ficha."
+        }
       ]
     ],
     "experiments": {

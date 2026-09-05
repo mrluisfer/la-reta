@@ -1,4 +1,3 @@
-import { MAX_TEAM_NAME } from "@/lib/team-names";
 import { useState } from "react";
 import { Modal, Pressable, TextInput, View } from "react-native";
 
@@ -7,7 +6,7 @@ import { Text } from "@/components/ui/text";
 import { Palette, Radius, Shadow, Spacing, Type } from "@/constants/theme";
 
 /**
- * Renombrar un equipo.
+ * Poner nombre a algo: un equipo, un invitado.
  *
  * Un modal propio y no `Alert.prompt`: ese solo existe en iOS, y una app que
  * también corre en Android no puede tener una función que desaparece según el
@@ -24,15 +23,20 @@ import { Palette, Radius, Shadow, Spacing, Type } from "@/constants/theme";
  * remonta y el campo trae su nombre sin sincronizar nada: el estado inicial ya
  * es el correcto.
  */
-export function TeamNameDialog({
+export function NameDialog({
   current,
   placeholder,
+  label,
+  maxLength,
   onSave,
   onClose,
 }: {
   /** El nombre puesto por el usuario; vacío si aún es el de fábrica. */
   current: string;
   placeholder: string;
+  /** Antetítulo del campo: dice qué se está nombrando. */
+  label: string;
+  maxLength: number;
   onSave: (value: string) => void;
   onClose: () => void;
 }) {
@@ -69,14 +73,14 @@ export function TeamNameDialog({
             }}
           >
             <Text tone="muted" variant="eyebrow">
-              Nombre del equipo
+              {label}
             </Text>
 
             <TextInput
-              accessibilityLabel="Nombre del equipo"
+              accessibilityLabel={label}
               autoCapitalize="words"
               autoFocus
-              maxLength={MAX_TEAM_NAME}
+              maxLength={maxLength}
               onChangeText={setValue}
               onSubmitEditing={save}
               placeholder={placeholder}

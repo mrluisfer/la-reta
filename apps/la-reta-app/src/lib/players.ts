@@ -1,6 +1,7 @@
 import {
   playerPositions,
   positionGroup,
+  type Position,
   type PositionGroup,
 } from "@repo/reta/positions";
 
@@ -31,6 +32,31 @@ export const GROUP_LABEL: Record<PositionGroup, string> = {
   DEF: "Defensas",
   MID: "Medios",
   FWD: "Delanteros",
+};
+
+/**
+ * El nombre de cada posición, para cuando las tres letras no bastan.
+ *
+ * Vive aquí y no en el paquete de dominio porque son etiquetas de interfaz: el
+ * balanceador y el enum de Postgres solo necesitan las siglas, y traducirlas es
+ * cosa de lo que se enseña, no de lo que se guarda.
+ */
+export const POSITION_LABEL: Record<Position, string> = {
+  GK: "Portero",
+  RB: "Lateral derecho",
+  RWB: "Carrilero derecho",
+  CB: "Central",
+  LB: "Lateral izquierdo",
+  LWB: "Carrilero izquierdo",
+  CDM: "Contención",
+  CM: "Medio centro",
+  CAM: "Media punta",
+  RM: "Volante derecho",
+  LM: "Volante izquierdo",
+  RW: "Extremo derecho",
+  LW: "Extremo izquierdo",
+  CF: "Segundo delantero",
+  ST: "Delantero centro",
 };
 
 /** Versión corta para el filtro: las largas no caben en una fila de cinco. */
