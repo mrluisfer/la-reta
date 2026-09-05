@@ -8,9 +8,12 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
-import { Palette, Spacing } from "@/constants/theme";
+import { Palette, Radius, Spacing } from "@/constants/theme";
+import { downloadPhoto } from "@/lib/photo-download";
+import { photoSource } from "@/lib/photos";
 import { uploadPhoto } from "@/lib/signup";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -34,6 +37,11 @@ const SIZE = 104;
  * Sube al soltar, no al enviar el formulario. Así el error de red —que es el
  * fallo más probable de todo esto— aparece cuando todavía estás mirando la
  * foto, y no al final, mezclado con el resto de la solicitud.
+ *
+ * Quitar pregunta antes. La foto no está en ningún otro sitio del teléfono —se
+ * eligió, se recortó y se subió— así que un toque de más en un enlace rojo se
+ * lleva algo que hay que volver a hacer entero; por eso, al lado, el botón de
+ * descarga: recuperarla es guardarla.
  */
 export function PhotoField({
   url,
@@ -43,6 +51,8 @@ export function PhotoField({
   onChange: (url: string | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pressed = useSharedValue(0);
 
@@ -80,6 +90,20 @@ export function PhotoField({
       setError(err instanceof Error ? err.message : "No se pudo subir.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function save() {
+    if (url === null || saving) return;
+
+    setError(null);
+    setSaving(true);
+    try {
+      await downloadPhoto(url);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -132,7 +156,10 @@ export function PhotoField({
               alt="Tu foto"
               contentFit="cover"
               contentPosition="top center"
-              source={{ uri: url }}
+              // Por `photoSource` y no crudo: las fotos ya guardadas pueden ser
+              // una ruta del servidor (`/players/95.webp`), y `expo-image` no
+              // sabe resolverla sin el origen delante.
+              source={photoSource(url)}
               style={{ width: "100%", height: "100%" }}
               transition={220}
             />
@@ -163,20 +190,54 @@ export function PhotoField({
           </Text>
 
           {url ? (
-            <Pressable
-              accessibilityLabel="Quitar la foto"
-              accessibilityRole="button"
-              hitSlop={Spacing.two}
-              onPress={() => onChange(null)}
-              style={({ pressed: down }) => ({
-                opacity: down ? 0.5 : 1,
-                alignSelf: "flex-start",
-              })}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: Spacing.three,
+              }}
             >
-              <Text tone="danger" variant="caption">
-                Quitar
-              </Text>
-            </Pressable>
+              <Pressable
+                accessibilityLabel="Quitar la foto"
+                accessibilityRole="button"
+                hitSlop={Spacing.two}
+                onPress={() => setConfirming(true)}
+                style={({ pressed: down }) => ({ opacity: down ? 0.5 : 1 })}
+              >
+                <Text tone="danger" variant="caption">
+                  Quitar
+                </Text>
+              </Pressable>
+
+              {/* Solo el icono: la bandeja con la flecha ya dice "guardar
+                  esto", y una palabra al lado de "Quitar" pondría dos enlaces
+                  de texto a competir por el mismo vistazo. */}
+              <Pressable
+                accessibilityLabel="Descargar la foto"
+                accessibilityRole="button"
+                disabled={saving}
+                hitSlop={Spacing.two}
+                onPress={save}
+                style={({ pressed: down }) => ({
+                  width: 34,
+                  height: 34,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: Radius.pill,
+                  borderCurve: "continuous",
+                  borderWidth: 1,
+                  borderColor: Palette.line,
+                  backgroundColor: Palette.surface,
+                  opacity: down || saving ? 0.5 : 1,
+                })}
+              >
+                {saving ? (
+                  <ActivityIndicator color={Palette.inkMuted} size="small" />
+                ) : (
+                  <Icon color={Palette.inkMuted} name="download" size={17} />
+                )}
+              </Pressable>
+            </View>
           ) : null}
         </View>
       </View>
@@ -186,6 +247,17 @@ export function PhotoField({
           {error}
         </Text>
       )}
+
+      {confirming ? (
+        <ConfirmDialog
+          confirmLabel="Quitar"
+          destructive
+          detail="Tu carta volverá a las iniciales. Si la quieres conservar, descárgala antes."
+          onClose={() => setConfirming(false)}
+          onConfirm={() => onChange(null)}
+          title="¿Quitar la foto?"
+        />
+      ) : null}
     </View>
   );
 }

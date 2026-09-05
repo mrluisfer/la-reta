@@ -19,7 +19,7 @@ import { Palette, Radius, Shadow, Spacing, Tones } from "@/constants/theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export type ButtonVariant = "primary" | "glass" | "ghost" | "plain";
+export type ButtonVariant = "primary" | "danger" | "glass" | "ghost" | "plain";
 export type ButtonSize = "lg" | "md";
 
 export type ButtonProps = {
@@ -48,9 +48,10 @@ export type ButtonProps = {
 
 /**
  * Botón de acción. `glass` usa el material de iOS 26; `primary` es el relleno
- * sólido que Apple reserva para la acción principal de la pantalla; `ghost`
- * dibuja solo el perímetro, para una acción secundaria que aun así tiene que
- * verse pulsable; `plain` es texto suelto.
+ * sólido que Apple reserva para la acción principal de la pantalla; `danger` es
+ * ese mismo relleno en rojo, para cuando confirmar borra algo; `ghost` dibuja
+ * solo el perímetro, para una acción secundaria que aun así tiene que verse
+ * pulsable; `plain` es texto suelto.
  *
  * El cristal nunca se usa para la acción principal a propósito: es traslúcido
  * por definición y su contraste depende de lo que tenga detrás, así que la
@@ -139,9 +140,7 @@ export function Button({
       {content}
       {loading ? (
         <View style={{ position: "absolute" }}>
-          <ActivityIndicator
-            color={variant === "primary" ? Palette.accentInk : Palette.ink}
-          />
+          <ActivityIndicator color={spinnerColor(variant)} />
         </View>
       ) : null}
     </View>
@@ -183,6 +182,12 @@ export function Button({
         </View>
       ) : null}
 
+      {variant === "danger" ? (
+        <View style={[shape, { backgroundColor: Palette.danger }]}>
+          {inner}
+        </View>
+      ) : null}
+
       {variant === "ghost" ? (
         <View
           style={[
@@ -206,6 +211,13 @@ export function Button({
 function toneFor(variant: ButtonVariant, inert: boolean) {
   if (inert) return "faint" as const;
   if (variant === "primary") return "onAccent" as const;
+  if (variant === "danger") return "onDanger" as const;
   if (variant === "plain") return "muted" as const;
   return "ink" as const;
+}
+
+function spinnerColor(variant: ButtonVariant) {
+  if (variant === "primary") return Palette.accentInk;
+  if (variant === "danger") return Palette.dangerInk;
+  return Palette.ink;
 }

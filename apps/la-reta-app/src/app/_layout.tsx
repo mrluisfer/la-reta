@@ -69,6 +69,17 @@ export default function RootLayout() {
                   Refresh no vuelve a aplicar estas opciones, así que un cambio
                   aquí pide recargar la app entera antes de creerse lo que se
                   ve. */}
+              {/* Editar la propia ficha. En la raíz porque se abre desde
+                  Inicio, Plantilla y Buscar: colgada de una sola pila, volver
+                  devolvería a la pestaña equivocada. */}
+              <Stack.Screen
+                name="editar-ficha"
+                options={{
+                  presentation: "formSheet",
+                  sheetAllowedDetents: [0.9],
+                  sheetGrabberVisible: true,
+                }}
+              />
               <Stack.Screen
                 name="calendario"
                 options={{

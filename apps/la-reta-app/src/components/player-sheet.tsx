@@ -1,4 +1,6 @@
+import { useAuth } from "@clerk/expo";
 import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import Animated, {
   interpolate,
@@ -8,10 +10,12 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { FifaCard } from "@/components/fifa-card";
+import { isClerkConfigured } from "@/components/auth-provider";
 import { Notice } from "@/components/notice";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { StatRadar } from "@/components/stat-radar";
 import { Icon } from "@/components/ui/icon";
+import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { Surface } from "@/components/ui/surface";
 import { Text } from "@/components/ui/text";
@@ -22,6 +26,7 @@ import {
   Spacing,
 } from "@/constants/theme";
 import { useReta } from "@/hooks/use-reta";
+import { claimPlayer, loadOwnedPlayerId } from "@/lib/signup";
 import { formatMatchDate } from "@/lib/dates";
 import {
   FOOT_LABEL,
@@ -33,6 +38,7 @@ import {
   type GoalEntry,
 } from "@/lib/players";
 import { cardTier, TIER_LABEL } from "@/lib/ratings";
+import type { Player } from "@/lib/types";
 import { standingLine } from "@/lib/teams";
 
 /**
@@ -64,6 +70,7 @@ export function PlayerSheet() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { players, matches, loading, error, refetch } = useReta();
+  const claim = useClaim(refetch);
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scroll = useScrollViewOffset(scrollRef);
@@ -156,6 +163,51 @@ export function PlayerSheet() {
         scrollEventThrottle={16}
       >
         <Stack.Screen options={{ title: player.displayName }} />
+
+        {/* Solo si la ficha no tiene dueño y tu cuenta no tiene otra. Es el
+            único sitio donde la pregunta tiene sentido: estás mirando la ficha
+            y sabes si eres tú. */}
+        {claim.isMine(player) ? (
+          <Button
+            icon="pencil"
+            label="Editar mi ficha"
+            onPress={() =>
+              router.push({
+                pathname: "/editar-ficha",
+                params: { id: String(player.id) },
+              })
+            }
+            size="md"
+            variant="ghost"
+          />
+        ) : null}
+
+        {claim.canClaim(player) ? (
+          <Surface style={{ gap: Spacing.three }}>
+            <View style={{ gap: Spacing.one }}>
+              <Text variant="bodyStrong">¿Esta ficha es tuya?</Text>
+              <Text tone="muted" variant="caption">
+                Al vincularla, tus goles y tu overall quedan atados a tu cuenta.
+                Solo puede reclamarla una persona.
+              </Text>
+            </View>
+
+            {claim.error === null ? null : (
+              <Text tone="danger" variant="caption">
+                {claim.error}
+              </Text>
+            )}
+
+            <Button
+              icon="person"
+              label="Esta es mi ficha"
+              loading={claim.busy}
+              onPress={() => claim.run(player.id)}
+              size="md"
+              variant="ghost"
+            />
+          </Surface>
+        ) : null}
 
         <Section
           meta={rank ? `#${rank.rank} de ${rank.total}` : undefined}
@@ -431,4 +483,59 @@ function Detail({ label, value }: { label: string; value: string }) {
       <Text variant="bodyStrong">{value}</Text>
     </View>
   );
+}
+
+/**
+ * Reclamar la ficha que estás mirando.
+ *
+ * La pregunta "¿puedo reclamarla?" se responde con dos datos: que la ficha no
+ * tenga dueño y que tu cuenta no tenga ya otra. El segundo lo sabe el servidor
+ * —`/api/v1/players/me`—, así que se pide una vez al montar; el primero viene
+ * en la propia ficha.
+ *
+ * Al vincular se refresca el roster: la ficha cambia de dueño y el botón "No
+ * estoy" de Plantilla tiene que enterarse.
+ */
+function useClaim(refetch: () => void) {
+  const { isSignedIn } = useAuth();
+  const [ownedId, setOwnedId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    loadOwnedPlayerId().then((value) => {
+      if (alive) setOwnedId(value);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return {
+    busy,
+    error,
+    canClaim: (player: Player) =>
+      isClerkConfigured &&
+      isSignedIn === true &&
+      ownedId === null &&
+      !player.clerkUserId,
+    /** La ficha es tuya: lo dice el servidor, no el `clerkUserId` de la fila. */
+    isMine: (player: Player) => ownedId === player.id,
+    run: async (playerId: number) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await claimPlayer(playerId);
+        setOwnedId(playerId);
+        refetch();
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error ? err.message : "No pudimos vincular la ficha."
+        );
+      } finally {
+        setBusy(false);
+      }
+    },
+  };
 }
