@@ -137,6 +137,15 @@ const RootLayout = ({
       )}
     >
       <body className="min-h-full">
+        {/* Sin JS, Motion nunca llega a correr y todo lo que entra escalonado se
+            quedaría en `opacity: 0`. Esta regla lo devuelve a visible. */}
+        <noscript>
+          <style>
+            {
+              '[data-motion="reveal"]{opacity:1!important;transform:none!important}'
+            }
+          </style>
+        </noscript>
         <div className="root">
           <ClerkProvider>
             <Providers>

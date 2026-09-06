@@ -1,6 +1,6 @@
 import { formatShortDate } from "@/lib/dates";
 import { matchGoals } from "@/lib/teams";
-import type { Match, Scorer } from "@/lib/types";
+import type { Match, Scorer, StatSnapshot } from "@/lib/types";
 
 /**
  * Las series que dibujan las gráficas de portada.
@@ -111,4 +111,31 @@ export function topScorers(
         a.name.localeCompare(b.name)
     )
     .slice(0, limit);
+}
+
+/** Ver `MatchdayGoals`: `CartesianChart` pide `Record<string, unknown>`. */
+export type OverallPoint = {
+  /** Orden en el eje. La fecha va en la etiqueta; el hueco entre ajustes no. */
+  step: number;
+  label: string;
+  overall: number;
+};
+
+/**
+ * Cómo ha ido cambiando el overall, del primer ajuste al último.
+ *
+ * El eje es el número de ajuste y no la fecha, aunque la etiqueta sí la diga.
+ * Los retoques llegan a rachas —cuatro en una tarde de revisión y ninguno en
+ * dos meses—, y en un eje de tiempo real esos cuatro se amontonan en un pixel
+ * y los dos meses son una recta muerta. Lo que la ficha cuenta es la
+ * *secuencia* de decisiones sobre el jugador, no cuándo se tomaron.
+ */
+export function overallSeries(
+  history: StatSnapshot[] | null | undefined
+): OverallPoint[] {
+  return (history ?? []).map((snapshot, index) => ({
+    step: index,
+    label: formatShortDate(snapshot.recordedAt),
+    overall: snapshot.overall,
+  }));
 }

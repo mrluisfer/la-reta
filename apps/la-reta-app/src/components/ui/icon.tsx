@@ -39,6 +39,7 @@ export type IconName =
   | "refresh"
   | "camera"
   | "download"
+  | "star-fill"
   | "eye"
   | "eye-off"
   | "pin";
@@ -311,6 +312,16 @@ export function Icon({
         <Path
           d="M12 3 L14.35 8.76 L20.56 9.22 L15.8 13.24 L17.29 19.28 L12 16 L6.71 19.28 L8.2 13.24 L3.44 9.22 L9.65 8.76 Z"
           {...stroke}
+        />
+      ) : null}
+
+      {/* La misma estrella maciza. Una nota se cuenta con estrellas llenas: de
+          contorno, un cinco sobre cinco se lee como cero. */}
+      {name === "star-fill" ? (
+        <Path
+          d="M12 3 L14.35 8.76 L20.56 9.22 L15.8 13.24 L17.29 19.28 L12 16 L6.71 19.28 L8.2 13.24 L3.44 9.22 L9.65 8.76 Z"
+          fill={color}
+          stroke="none"
         />
       ) : null}
 

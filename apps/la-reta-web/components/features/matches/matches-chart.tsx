@@ -28,15 +28,15 @@ const chartConfig = {
  * compare matches at a glance. Reused on the dashboard and the matches page.
  * `matches` comes newest-first; we plot the last `limit` chronologically.
  */
-export function MatchesChart({
+export const MatchesChart = ({
   matches,
   limit = 8,
   className,
 }: {
-  matches: MatchWithScorers[];
-  limit?: number;
-  className?: string;
-}) {
+  readonly matches: MatchWithScorers[];
+  readonly limit?: number;
+  readonly className?: string;
+}) => {
   const data = matches
     .slice(0, limit)
     .reverse()
@@ -52,7 +52,12 @@ export function MatchesChart({
     : 0;
 
   return (
-    <Card className={cn("h-fit", className)} size="sm">
+    // `reveal-on-scroll` (scroll-driven CSS, `animation-timeline: view()`) en
+    // vez de un `whileInView` de Motion: la gráfica suele quedar bajo el
+    // pliegue y esto la deja entrar al llegar a ella sin coste de JS ni de
+    // hilo principal. Es además lo que ya usa el historial de esta misma
+    // página, así que ambos entran igual. Recharts anima sus barras aparte.
+    <Card className={cn("reveal-on-scroll h-fit", className)} size="sm">
       <CardHeader className="border-b">
         <CardTitle className="text-base">Goles por partido</CardTitle>
         <CardDescription>
@@ -96,4 +101,4 @@ export function MatchesChart({
       </CardContent>
     </Card>
   );
-}
+};

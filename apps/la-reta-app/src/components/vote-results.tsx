@@ -1,4 +1,5 @@
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
+import Svg, { Circle } from "react-native-svg";
 
 import { PlayerAvatar } from "@/components/player-avatar";
 import { Icon, type IconName } from "@/components/ui/icon";
@@ -9,28 +10,50 @@ import type { Player, VoteCategory, VoteTally } from "@/lib/types";
 /**
  * Lo que votó la banda después del partido: figura, golazo y blooper.
  *
- * Cada categoría enseña al más votado con su proporción sobre el total, porque
- * "3 votos" no dice si ganó por poco o por unanimidad.
+ * **En tres columnas, no en tres filas.** Cada premio es un nombre y una
+ * proporción; puestos en fila ocupaban tres renglones enteros para tres datos
+ * pequeños, y el ancho del móvil se quedaba vacío a la derecha. En columnas los
+ * tres se comparan de una mirada, que es justo lo que se hace con un palmarés.
  *
- * Sin tarjetas de colores. La versión anterior teñía cada fila de ámbar, verde
- * y rojo, y tres bloques pastel apilados son exactamente lo que hace que una
- * pantalla parezca una plantilla. La categoría se distingue por su icono y su
- * antetítulo, que es suficiente cuando solo hay tres.
+ * La proporción de votos es el aro alrededor de la cara. Un aro es la forma
+ * natural de "cuánto de un total" y, pegado al retrato, no gasta ni un renglón
+ * más: el "3 de 6" que va debajo es para quien quiera la cifra exacta.
+ *
+ * El color solo vive en el aro, el icono y la etiqueta. La versión anterior
+ * teñía la fila entera de ámbar, verde y rojo, y tres bloques pastel apilados
+ * son exactamente lo que hace que una pantalla parezca una plantilla.
+ *
+ * **La columna entera lleva a su ficha**, no solo el nombre: el retrato es lo
+ * más grande y lo primero a lo que va el pulgar. Aquí no hace falta caja para
+ * separar los destinos —son tres columnas con su propio aire— y ponerla
+ * encajonaría tres aros que se sostienen solos.
  */
 
-const CATEGORIES: { key: VoteCategory; label: string; icon: IconName }[] = [
-  { key: "figura", label: "Figura", icon: "star" },
-  { key: "gol", label: "Golazo", icon: "ball" },
-  { key: "error", label: "Blooper", icon: "flame" },
+const CATEGORIES: {
+  key: VoteCategory;
+  label: string;
+  icon: IconName;
+  color: string;
+}[] = [
+  { key: "figura", label: "Figura", icon: "star-fill", color: Palette.star },
+  { key: "gol", label: "Golazo", icon: "ball", color: Palette.accent },
+  { key: "error", label: "Blooper", icon: "flame", color: Palette.danger },
 ];
+
+/** Lado del retrato con su aro, en puntos. */
+const RING = 62;
+const RING_WIDTH = 3;
 
 export function VoteResults({
   tally,
   players,
+  onOpenPlayer,
 }: {
   tally: VoteTally[] | null;
   /** Roster para poner cara al más votado; los invitados van con iniciales. */
   players?: Player[] | null;
+  /** Abre la ficha del premiado. Los invitados no la tienen. */
+  onOpenPlayer: (playerId: number) => void;
 }) {
   const results = CATEGORIES.map((category) => {
     const rows = (tally ?? []).filter((row) => row.category === category.key);
@@ -47,8 +70,8 @@ export function VoteResults({
       total,
       count: winner.count,
       // El recuento trae el nombre del registro ("Paulo César Herrejón
-      // Chávez") y no cabe en una fila; si está en el roster gana su nombre de
-      // carta, que es como se le dice de verdad.
+      // Chávez") y no cabe en una columna; si está en el roster gana su nombre
+      // de carta, que es como se le dice de verdad.
       name: player?.displayName ?? winner.name,
       player,
     };
@@ -57,41 +80,34 @@ export function VoteResults({
   if (results.length === 0) return null;
 
   return (
-    <View>
-      {results.map((entry, index) => (
-        <View
+    <View style={{ flexDirection: "row", gap: Spacing.two }}>
+      {results.map((entry) => (
+        <Pressable
+          accessibilityLabel={
+            entry.player === null
+              ? undefined
+              : `Abrir la ficha de ${entry.name}`
+          }
+          accessibilityRole={entry.player === null ? undefined : "button"}
+          disabled={entry.player === null}
           key={entry.key}
-          style={{
-            flexDirection: "row",
+          onPress={() => entry.player && onOpenPlayer(entry.player.id)}
+          style={({ pressed }) => ({
+            flex: 1,
             alignItems: "center",
-            gap: Spacing.three,
-            paddingVertical: Spacing.three,
-            borderBottomWidth: index === results.length - 1 ? 0 : 1,
-            borderBottomColor: Palette.hairline,
-          }}
+            gap: Spacing.two,
+            paddingVertical: Spacing.two,
+            opacity: pressed ? 0.55 : 1,
+          })}
         >
-          {entry.player ? (
-            <PlayerAvatar player={entry.player} size={38} />
-          ) : (
-            <View
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 19,
-                backgroundColor: Palette.surfaceSunken,
-                borderWidth: 1,
-                borderColor: Palette.line,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text tone="faint" variant="caption">
-                {entry.name.slice(0, 2).toUpperCase()}
-              </Text>
-            </View>
-          )}
+          <Portrait
+            color={entry.color}
+            name={entry.name}
+            player={entry.player}
+            share={entry.total === 0 ? 0 : entry.count / entry.total}
+          />
 
-          <View style={{ flex: 1, gap: Spacing.half }}>
+          <View style={{ alignItems: "center", gap: Spacing.half }}>
             <View
               style={{
                 flexDirection: "row",
@@ -100,30 +116,100 @@ export function VoteResults({
               }}
             >
               <Icon
-                color={Palette.inkFaint}
+                color={entry.color}
                 name={entry.icon}
-                size={11}
+                size={12}
                 strokeWidth={2}
               />
-              <Text tone="faint" variant="eyebrow">
+              <Text style={{ color: entry.color }} variant="eyebrow">
                 {entry.label}
               </Text>
             </View>
+
             <Text numberOfLines={1} variant="bodyStrong">
               {entry.name}
             </Text>
-          </View>
-
-          <View style={{ alignItems: "flex-end" }}>
-            <Text tone="accent" variant="statSmall">
-              {entry.count}
-            </Text>
-            <Text tone="faint" variant="eyebrow">
-              de {entry.total}
+            <Text tone="faint" variant="caption">
+              {entry.count} de {entry.total}
             </Text>
           </View>
-        </View>
+        </Pressable>
       ))}
+    </View>
+  );
+}
+
+/**
+ * El retrato del más votado con su aro de proporción.
+ *
+ * El aro se dibuja con un círculo punteado al que se le deja fuera el tramo que
+ * falta (`strokeDasharray` + `strokeDashoffset`), girado un cuarto de vuelta
+ * para que empiece arriba. Es el truco de siempre y aquí no necesita más: son
+ * tres aros quietos, no una gráfica que haya que animar.
+ */
+function Portrait({
+  player,
+  name,
+  share,
+  color,
+}: {
+  player: Player | null;
+  name: string;
+  share: number;
+  color: string;
+}) {
+  const radius = (RING - RING_WIDTH) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const inner = RING - RING_WIDTH * 4;
+
+  return (
+    <View
+      style={{ width: RING, height: RING, alignItems: "center", justifyContent: "center" }}
+    >
+      <Svg height={RING} style={{ position: "absolute" }} width={RING}>
+        <Circle
+          cx={RING / 2}
+          cy={RING / 2}
+          fill="none"
+          r={radius}
+          stroke={Palette.surfaceSunken}
+          strokeWidth={RING_WIDTH}
+        />
+        <Circle
+          cx={RING / 2}
+          cy={RING / 2}
+          fill="none"
+          origin={`${RING / 2}, ${RING / 2}`}
+          r={radius}
+          rotation={-90}
+          stroke={color}
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - Math.min(share, 1))}
+          strokeLinecap="round"
+          strokeWidth={RING_WIDTH}
+        />
+      </Svg>
+
+      {player ? (
+        <PlayerAvatar player={player} size={inner} />
+      ) : (
+        <View
+          style={{
+            width: inner,
+            height: inner,
+            borderRadius: inner / 2,
+            backgroundColor: Palette.surfaceSunken,
+            borderWidth: 1,
+            borderColor: Palette.line,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text tone="faint" variant="caption">
+            {name.slice(0, 2).toUpperCase()}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

@@ -126,3 +126,39 @@ export function standingLine(teams: MatchTeam[], key: string | null): string {
 
   return `${own.name} ${own.score} · ${own.rank}º de ${ranked.length}`;
 }
+
+/**
+ * Cuánta gente jugó.
+ *
+ * Sale de las filas del acta y no de una columna: el registro guarda una por
+ * participante aunque no marque —gol cero también cuenta—, así que contarlas es
+ * contar la convocatoria. Es el mismo truco con el que la ficha de jugador sabe
+ * en qué partidos estuvo.
+ */
+export function matchParticipants(match: Match): number {
+  return match.scorers.length;
+}
+
+/** Asistencias del partido, sumando a todos los que aparecen en el acta. */
+export function matchAssists(match: Match): number {
+  return match.scorers.reduce((total, scorer) => total + scorer.assists, 0);
+}
+
+/** Segundos en la hora del partido. */
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+
+/**
+ * "1 h 22 min". Devuelve `null` cuando el acta no apuntó duración, que es lo
+ * normal en los partidos cargados a mano.
+ */
+export function formatDuration(seconds: number | null): string | null {
+  if (seconds === null || seconds <= 0) return null;
+
+  const minutes = Math.round(seconds / SECONDS_PER_MINUTE);
+  const hours = Math.floor(minutes / MINUTES_PER_HOUR);
+  const rest = minutes % MINUTES_PER_HOUR;
+
+  if (hours === 0) return `${rest} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}

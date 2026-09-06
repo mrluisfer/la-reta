@@ -1,4 +1,8 @@
 import { ElevenBoard } from "@/components/app/eleven-board";
+import { CountUp } from "@/components/motion/count-up";
+import { SPRING_POP } from "@/components/motion/motion-tokens";
+import { StaggerGroup, StaggerItem } from "@/components/motion/stagger-group";
+import * as m from "motion/react-m";
 import { RankingLevel } from "@/components/app/ranking-level";
 import { ScorerNotFound } from "@/components/app/scorer-not-found";
 import { Spotlight } from "@/components/app/spotlight";
@@ -78,24 +82,29 @@ const DashboardPage = async () => {
   }
 
   return (
-    <div className="space-y-6 xl:container xl:mx-auto">
+    // El dashboard entra por bloques, de arriba abajo: el ojo sigue el orden de
+    // lectura en vez de recibir toda la página de golpe. Los wrappers de Motion
+    // solo reciben `children`, así que esta página sigue siendo Server Component.
+    <StaggerGroup className="space-y-6 xl:container xl:mx-auto">
       {/* Countdown a la próxima reta (solo ≤2 días antes)  */}
       <RetaCountdownBanner />
 
       {/*  Matchday banner  */}
-      <MatchdayBanner
-        bannerWords={bannerWords}
-        stats={{
-          total,
-          avgOverall,
-          avgAge,
-          leaderOverall: best.overall,
-          leaderName: best.displayName,
-        }}
-      />
+      <StaggerItem>
+        <MatchdayBanner
+          bannerWords={bannerWords}
+          stats={{
+            total,
+            avgOverall,
+            avgAge,
+            leaderOverall: best.overall,
+            leaderName: best.displayName,
+          }}
+        />
+      </StaggerItem>
 
       {/* Destacados: crack + goleador + jugadores (horizontal en desktop) */}
-      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+      <StaggerItem className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
         <Spotlight
           highlight
           title="El crack"
@@ -111,15 +120,15 @@ const DashboardPage = async () => {
           <ScorerNotFound />
         )}
         <RotatingPlayer players={players} />
-      </div>
+      </StaggerItem>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <StaggerItem className="grid gap-6 lg:grid-cols-2">
         <Commentator />
         <PlayerLegend />
-      </div>
+      </StaggerItem>
 
       {/* Pizarra + ranking  */}
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
+      <StaggerItem className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
         <div className="space-y-2">
           {/* Pizarra del once ideal */}
           <ElevenBoard players={players} counts={counts} />
@@ -139,8 +148,8 @@ const DashboardPage = async () => {
           <RankingLevel players={players} />
           {matches.length > 0 && <MatchesChart matches={matches} />}
         </div>
-      </div>
-    </div>
+      </StaggerItem>
+    </StaggerGroup>
   );
 };
 
@@ -149,18 +158,34 @@ export default DashboardPage;
 /** Compact 6-attribute strip used in the "El crack" spotlight footer. */
 const StatStrip = ({ player }: { readonly player: Player }) => {
   return (
-    <div className="grid w-full grid-cols-6 gap-1">
+    <m.div
+      animate="show"
+      className="grid w-full grid-cols-6 gap-1"
+      initial="hidden"
+      variants={{
+        hidden: {},
+        show: { transition: { staggerChildren: 0.05, delayChildren: 0.25 } },
+      }}
+    >
       {STAT_KEYS.map((k) => (
-        <div key={k} className="text-center">
+        <m.div
+          className="text-center"
+          data-motion="reveal"
+          key={k}
+          variants={{
+            hidden: { opacity: 0, y: 8 },
+            show: { opacity: 1, y: 0, transition: SPRING_POP },
+          }}
+        >
           <p className="font-mono text-sm leading-none font-bold tabular-nums">
-            {player[k]}
+            <CountUp value={player[k]} />
           </p>
           <p className="text-muted-foreground mt-0.5 text-xs font-semibold tracking-wide">
             {STAT_ABBR[k]}
           </p>
-        </div>
+        </m.div>
       ))}
-    </div>
+    </m.div>
   );
 };
 

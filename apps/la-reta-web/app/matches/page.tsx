@@ -72,10 +72,20 @@ const MatchesPage = async () => {
           </section>
 
           {/* top-16, no top-6: el header es sticky (h-12) y con 6 la tabla de
-            goleadores se metía debajo al hacer scroll. */}
+            goleadores se metía debajo al hacer scroll.
+            La tabla crece con cada jornada; sin un techo, al fijarla acababa
+            más alta que la ventana y su final quedaba fuera de alcance. Con
+            `dvh` el tope sigue a la barra del navegador en móvil, y
+            `overscroll-contain` evita que al terminar de recorrerla el scroll
+            salte a la página de atrás. */}
           <section className="space-y-3 lg:sticky lg:top-16">
-            <SectionHeading title="Goles y asistencias" />
-            <TopScorersCard scorers={scorers} />
+            <SectionHeading
+              title="Goles y asistencias"
+              count={scorers.length}
+            />
+            <div className="lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:overscroll-contain">
+              <TopScorersCard scorers={scorers} />
+            </div>
           </section>
         </div>
       </div>

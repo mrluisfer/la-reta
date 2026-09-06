@@ -1,12 +1,12 @@
 import { View } from "react-native";
 
 import { MatchPhoto } from "@/components/match-photo";
+import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { Display, Palette, Radius, Spacing } from "@/constants/theme";
 import { formatMatchDate } from "@/lib/dates";
 import {
-  balanceLabel,
-  matchGoals,
+  formatDuration,
   rankedTeams,
   teamColor,
   type RankedTeam,
@@ -27,8 +27,9 @@ import type { Match } from "@/lib/types";
  * era el que marcó.
  *
  * Con tres o más equipos esto es una tabla, así que lleva puesto. Y quien ganó
- * se marca con tinta plena; los demás quedan en gris. No hace falta un adorno
- * para decir quién fue primero.
+ * se marca con tinta plena, con una copa pequeña al lado; los demás quedan en
+ * gris. La copa es la única concesión: en un empate arriba marca a los dos, que
+ * es algo que el puesto solo no sabe decir.
  *
  * La foto abre la ficha, entera y con su proporción —aquí no es un adorno de
  * cabecera sino el documento del partido, y recortarla a una franja para que
@@ -39,10 +40,10 @@ import type { Match } from "@/lib/types";
  */
 export function MatchHero({ match }: { match: Match }) {
   const ranked = rankedTeams(match);
-  const total = matchGoals(match);
   /** Un duelo no necesita tabla: con dos filas el orden ya es el puesto. */
   const showRank = ranked.length > 2;
   const shared = ranked.filter((team) => team.isWinner).length > 1;
+  const duration = formatDuration(match.durationSec);
 
   return (
     <View style={{ gap: Spacing.three }}>
@@ -54,7 +55,8 @@ export function MatchHero({ match }: { match: Match }) {
       />
 
       <Text tone="muted" variant="eyebrow">
-        {formatMatchDate(match.playedAt)} · {balanceLabel(match.balance)}
+        {formatMatchDate(match.playedAt)}
+        {duration === null ? "" : ` · ${duration}`}
         {shared ? " · Empate arriba" : ""}
       </Text>
 
@@ -64,10 +66,6 @@ export function MatchHero({ match }: { match: Match }) {
         ))}
       </View>
 
-      <Text tone="faint" variant="caption">
-        {total} {total === 1 ? "gol" : "goles"} · {ranked.length} equipos ·
-        balance {match.balance}/100
-      </Text>
     </View>
   );
 }
@@ -101,12 +99,18 @@ function TeamRow({ team, showRank }: { team: RankedTeam; showRank: boolean }) {
 
       <Text
         numberOfLines={1}
-        style={{ flex: 1 }}
+        style={{ flexShrink: 1 }}
         tone={team.isWinner ? "ink" : "muted"}
         variant="bodyStrong"
       >
         {team.name}
       </Text>
+
+      <View style={{ flex: 1, paddingLeft: Spacing.two }}>
+        {team.isWinner ? (
+          <Icon color={Palette.star} name="trophy" size={15} strokeWidth={2} />
+        ) : null}
+      </View>
 
       <Text
         style={{
