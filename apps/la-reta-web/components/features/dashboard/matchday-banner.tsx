@@ -141,6 +141,7 @@ export const MatchdayBanner = ({ bannerWords, stats }: Props) => {
             className="h-auto w-full max-w-[190px] sm:max-w-[210px] lg:max-w-[240px]"
             height={1024}
             priority
+            sizes="(min-width: 1024px) 240px, (min-width: 640px) 210px, 190px"
             src="/fifa-credix.webp"
             width={1536}
           />
@@ -186,7 +187,7 @@ const Score = ({
         <CountUp value={value} />
       </p>
       {sub ? (
-        <p className="mt-0.5 truncate text-[11px] font-medium text-emerald-50/70">
+        <p className="mt-0.5 truncate text-xs font-medium text-emerald-50/70">
           {sub}
         </p>
       ) : null}

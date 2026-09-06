@@ -25,6 +25,12 @@ Cómo se escribe esto (para quien lo mantenga, humano o agente):
 
 - 📱 **Registro de retas.** Todo lo que ha ido repartiendo el generador, en gráficas: qué tan parejas van saliendo las retas, con cuántos equipos se juega normalmente, quién sale más convocado y qué parejas siempre caen en el mismo equipo. Se abre desde el carrusel de Inicio y desde _Armar reta_.
 
+### 🔧 Mejoras
+
+- 🖥️ **Cambiar dos jugadores de equipo ya no pide ratón.** En la cancha de _Armar equipos_ podías arrastrar una ficha sobre otra y nada más — sin ratón, o con el teclado, no había manera. Ahora tocas una ficha, tocas la otra y se cambian. Arrastrar sigue funcionando igual.
+
+- 🖥️ **La web va mucho más ligera.** Las fotos se estaban descargando a tamaño completo aunque se pintaran del tamaño de una moneda: la pantalla de un partido llegaba a ocupar 93 MB de memoria solo en imágenes, y por eso el navegador se atascaba al desplazarse, sobre todo en el teléfono. Ahora cada foto se pide al tamaño en que de verdad se ve —esa misma pantalla ocupa 3,6 MB— y las cartas de la galería se cargan según vas bajando. Nada cambia de aspecto; solo deja de pesar.
+
 ---
 
 ## Publicado — septiembre 2026

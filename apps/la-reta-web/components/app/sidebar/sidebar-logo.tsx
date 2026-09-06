@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { SidebarTitle } from "../sidebar-title";
 
-export function SidebarLogo() {
+export const SidebarLogo = () => {
   const year = new Date().getFullYear();
 
   return (
@@ -18,6 +18,7 @@ export function SidebarLogo() {
             alt="Reta Credix · FIFA 26"
             width={1536}
             height={1024}
+            sizes="28px"
             priority
             className="h-7 w-auto rounded-full"
           />
@@ -25,15 +26,15 @@ export function SidebarLogo() {
         <div className="min-w-0 group-data-[collapsible=icon]:hidden">
           <div className="flex items-center gap-2">
             <SidebarTitle />
-            <span className="bg-sidebar-accent text-sidebar-accent-foreground rounded-full px-2 py-0.5 text-[10px] font-semibold">
+            <span className="bg-sidebar-accent text-sidebar-accent-foreground rounded-full px-2 py-0.5 text-xs font-semibold">
               FIFA {year}
             </span>
           </div>
-          <p className="text-sidebar-foreground/65 mt-1 text-[11px]">
+          <p className="text-sidebar-foreground/65 mt-1 text-xs">
             Navegación principal de la reta
           </p>
         </div>
       </div>
     </Link>
   );
-}
+};

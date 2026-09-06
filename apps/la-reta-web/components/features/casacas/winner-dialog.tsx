@@ -15,13 +15,13 @@ import type { Player } from "@/lib/db/schema";
 import { initials } from "@/lib/format";
 import { ShirtIcon } from "lucide-react";
 
-export function WinnerDialog({
+export const WinnerDialog = ({
   winner,
   onClose,
 }: {
-  winner: Player | null;
-  onClose: () => void;
-}) {
+  readonly winner: Player | null;
+  readonly onClose: () => void;
+}) => {
   return (
     <Dialog open={winner != null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
@@ -38,7 +38,7 @@ export function WinnerDialog({
           <div className="flex items-center gap-4 py-2">
             <Avatar size="lg" className="size-16">
               {winner.photoUrl ? (
-                <AvatarImage src={winner.photoUrl} alt="" />
+                <AvatarImage src={winner.photoUrl} alt="" width={256} />
               ) : null}
               <AvatarFallback>{initials(winner.displayName)}</AvatarFallback>
             </Avatar>
@@ -54,4 +54,4 @@ export function WinnerDialog({
       </DialogContent>
     </Dialog>
   );
-}
+};

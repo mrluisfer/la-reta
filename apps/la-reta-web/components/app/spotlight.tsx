@@ -60,7 +60,12 @@ export const Spotlight = ({
         transitionTypes={["nav-forward"]}
       >
         <TiltCard className="rounded-xl">
-          <FifaCard className="card-shine" player={player} size="sm" />
+          <FifaCard
+            className="card-shine"
+            player={player}
+            size="sm"
+            sizes="112px"
+          />
         </TiltCard>
       </Link>
       <div className="min-w-0">
@@ -106,6 +111,12 @@ export const Spotlight = ({
 
   return (
     <Card className={cn(footer && "pb-0", highlight && "crack-ring")} size="sm">
+      {/* El aro necesita su propia capa: la máscara que lo recorta al borde se
+          queda quieta mientras el degradado gira por debajo (ver `.crack-ring`
+          en globals.css). */}
+      {highlight ? (
+        <span aria-hidden="true" className="crack-ring-glow" />
+      ) : null}
       <CardHeader className="border-b">
         <CardTitle className="font-display text-lg font-semibold tracking-wide uppercase">
           {title}

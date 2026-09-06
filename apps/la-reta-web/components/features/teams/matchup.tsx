@@ -23,7 +23,7 @@ import { DownloadIcon, InfoIcon, LayoutGridIcon, ListIcon } from "lucide-react";
 import * as React from "react";
 import { ViewTab } from "./view-tab";
 
-export function Matchup({
+export const Matchup = ({
   result,
   view,
   names,
@@ -31,14 +31,14 @@ export function Matchup({
   onViewChange,
   onSwap,
 }: {
-  result: BalancedTeams;
-  view: MatchupView;
+  readonly result: BalancedTeams;
+  readonly view: MatchupView;
   /** Nombres por índice de equipo (A, B, C …). */
-  names: string[];
-  hasResult: boolean;
-  onViewChange: (view: MatchupView) => void;
-  onSwap?: (fromId: number, toId: number) => void;
-}) {
+  readonly names: string[];
+  readonly hasResult: boolean;
+  readonly onViewChange: (view: MatchupView) => void;
+  readonly onSwap?: (fromId: number, toId: number) => void;
+}) => {
   const { teams, diff } = result;
   const { pitchRef, exportPitchRef, listRef, exportListRef, busy, download } =
     useMatchupDownload(view);
@@ -80,11 +80,10 @@ export function Matchup({
           </span>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {/* View switch: changes presentation of the SAME teams, no reshuffle. */}
-            {hasResult && (
-              <div
-                className="bg-muted inline-flex rounded-xl p-0.5"
-                role="group"
+            {hasResult ? (
+              <fieldset
                 aria-label="Vista"
+                className="bg-muted inline-flex rounded-xl p-0.5"
               >
                 <ViewTab
                   active={view === "board"}
@@ -98,8 +97,8 @@ export function Matchup({
                   icon={<ListIcon className="size-3.5" />}
                   label="Lista"
                 />
-              </div>
-            )}
+              </fieldset>
+            ) : null}
             <Button variant="default" onClick={download} disabled={busy}>
               <DownloadIcon />
               {busy ? "Generando…" : "Descargar imagen"}
@@ -132,7 +131,8 @@ export function Matchup({
             <MatchupPitch ref={pitchRef} {...pitchProps} onSwap={onSwap} />
             {onSwap ? (
               <p className="text-muted-foreground text-center text-xs">
-                Arrastra una ficha sobre otra para intercambiarlas.
+                Arrastra una ficha sobre otra para intercambiarlas — o toca las
+                dos.
               </p>
             ) : null}
             <div
@@ -163,20 +163,20 @@ export function Matchup({
       )}
     </section>
   );
-}
+};
 
 /** Todos los emparejamientos posibles; el tablero dibuja el elegido. */
-function PairPicker({
+const PairPicker = ({
   teams,
   names,
   active,
   onPick,
 }: {
-  teams: TeamSplit[];
-  names: string[];
-  active: [TeamKey, TeamKey];
-  onPick: (a: TeamKey, b: TeamKey) => void;
-}) {
+  readonly teams: TeamSplit[];
+  readonly names: string[];
+  readonly active: [TeamKey, TeamKey];
+  readonly onPick: (a: TeamKey, b: TeamKey) => void;
+}) => {
   const pairs: [TeamSplit, TeamSplit][] = [];
   for (let i = 0; i < teams.length; i++)
     for (let j = i + 1; j < teams.length; j++) pairs.push([teams[i], teams[j]]);
@@ -196,7 +196,7 @@ function PairPicker({
               "rounded-lg border px-2 py-1 text-xs font-medium transition-colors",
               on
                 ? "bg-foreground text-background border-transparent"
-                : "hover:bg-muted",
+                : "hover:bg-muted"
             )}
           >
             {teamName(names, a.key)} vs {teamName(names, b.key)}
@@ -205,15 +205,15 @@ function PairPicker({
       })}
     </div>
   );
-}
+};
 
-function ScoreboardHeader({
+const ScoreboardHeader = ({
   teams,
   names,
 }: {
-  teams: TeamSplit[];
-  names: string[];
-}) {
+  readonly teams: TeamSplit[];
+  readonly names: string[];
+}) => {
   const duel = teams.length === 2;
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4 bg-neutral-950 px-5 py-6 text-white">
@@ -234,7 +234,7 @@ function ScoreboardHeader({
             <p className="font-mono text-5xl leading-none font-black tabular-nums">
               {team.rating}
             </p>
-            <p className="mt-1 text-[11px] text-white/50">
+            <p className="mt-1 text-xs text-white/50">
               {team.lineups.length} jugadores · OVR prom.
             </p>
           </div>
@@ -242,9 +242,15 @@ function ScoreboardHeader({
       ))}
     </div>
   );
-}
+};
 
-function BalanceMeter({ teams, diff }: { teams: TeamSplit[]; diff: number }) {
+const BalanceMeter = ({
+  teams,
+  diff,
+}: {
+  readonly teams: TeamSplit[];
+  readonly diff: number;
+}) => {
   const total = teams.reduce((a, t) => a + t.rating, 0) || 1;
   const verdict =
     diff <= 1.5
@@ -283,9 +289,9 @@ function BalanceMeter({ teams, diff }: { teams: TeamSplit[]; diff: number }) {
       </p>
     </div>
   );
-}
+};
 
-function ExportSizeHint() {
+const ExportSizeHint = () => {
   return (
     <div className="flex items-center justify-center lg:hidden">
       <Badge variant="default">
@@ -293,4 +299,4 @@ function ExportSizeHint() {
       </Badge>
     </div>
   );
-}
+};

@@ -4,7 +4,7 @@ import { MicIcon, QuoteIcon } from "lucide-react";
 import Image from "next/image";
 
 /** Fun "pundit" panel on the dashboard. */
-export function Commentator() {
+export const Commentator = () => {
   return (
     <TiltCard className="h-fit rounded-lg lg:h-[264px]" {...PANEL_TILT}>
       <section className="ring-foreground/10 h-full overflow-hidden rounded-lg bg-[linear-gradient(120deg,#241433_0%,#150d24_55%,#0b0816_100%)] text-white ring-1">
@@ -15,6 +15,7 @@ export function Commentator() {
               alt="Chato Bermúdez"
               width={480}
               height={720}
+              sizes="(min-width: 640px) 176px, 112px"
               className="h-full w-full object-cover object-top"
             />
           </div>
@@ -35,4 +36,4 @@ export function Commentator() {
       </section>
     </TiltCard>
   );
-}
+};

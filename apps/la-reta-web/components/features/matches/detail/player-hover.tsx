@@ -79,6 +79,7 @@ export const PlayerHover = ({
           <Avatar className={`size-14 shrink-0 ring-2 ${TIER_RING[tier]}`}>
             {scorer.photoUrl ? (
               <AvatarImage
+                width={256}
                 alt={scorer.displayName}
                 className="object-cover object-top"
                 src={scorer.photoUrl}

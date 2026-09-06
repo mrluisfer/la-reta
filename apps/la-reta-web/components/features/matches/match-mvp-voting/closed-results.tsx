@@ -168,6 +168,7 @@ export const ClosedResults = ({
               <Avatar className="absolute inset-2 size-auto transition-transform duration-300 ease-out group-focus-within:scale-105 group-hover:scale-105 motion-reduce:transition-none">
                 {winner.photoUrl ? (
                   <AvatarImage
+                    width={256}
                     alt=""
                     className="object-cover object-top"
                     src={winner.photoUrl}
