@@ -60,7 +60,7 @@ The web app owns the database and is the source of truth; the mobile app talks t
 
 ```bash
 # 1. Clone and install (one install for every workspace)
-git clone https://github.com/mrluisfer/la-reta.git
+git clone https://github.com/La-Reta/la-reta.git
 cd la-reta
 npm install
 
@@ -115,7 +115,7 @@ docs/
 
 Contributions of all sizes are welcome! Please read **[CONTRIBUTING.md](./CONTRIBUTING.md)** and our **[Code of Conduct](./CODE_OF_CONDUCT.md)** first. Good first steps:
 
-- Open an [issue](https://github.com/mrluisfer/la-reta/issues) for a bug or idea.
+- Open an [issue](https://github.com/La-Reta/la-reta/issues) for a bug or idea.
 - Pick something small and send a focused pull request.
 
 Security reports go through [SECURITY.md](./SECURITY.md), not public issues.

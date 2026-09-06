@@ -71,7 +71,13 @@ The web app is **Next.js 16** and the mobile app is **Expo SDK 57**. Several API
 
    > There is no test runner configured. Verify your change by exercising the affected flow in the running app.
 
-4. Push and open a pull request against `main`, filling out the PR template.
+4. Push and open a pull request against `main`:
+
+   ```bash
+   gh pr create --fill
+   ```
+
+   `--fill` uses your commit as the PR title and body, so a good commit message is the whole PR. Without it you get the template to fill in by hand — say what changed, how you verified it, and add a before/after for anything visual.
 
 ## Commit messages
 
@@ -96,6 +102,6 @@ Common types: `feat`, `fix`, `docs`, `refactor`, `chore`, `style`, `perf`.
 
 ## Reporting bugs & requesting features
 
-Use the [issue templates](https://github.com/mrluisfer/la-reta/issues/new/choose). For security issues, please read [SECURITY.md](./SECURITY.md) instead of opening a public issue.
+Use the [issue templates](https://github.com/La-Reta/la-reta/issues/new/choose). For security issues, please read [SECURITY.md](./SECURITY.md) instead of opening a public issue.
 
 Happy hacking, and enjoy the reta! ⚽
