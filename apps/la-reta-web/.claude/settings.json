@@ -1,6 +1,0 @@
-{
-  "enabledPlugins": {
-    "code-review@claude-plugins-official": true,
-    "ponytail@ponytail": true
-  }
-}
