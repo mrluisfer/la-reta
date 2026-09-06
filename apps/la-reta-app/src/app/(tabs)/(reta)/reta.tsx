@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PitchLineup } from "@/components/pitch-lineup";
 import { useTabAction } from "@/components/tab-action";
+import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { Surface } from "@/components/ui/surface";
 import { Text } from "@/components/ui/text";
@@ -152,6 +153,18 @@ export default function RetaScreen() {
           {summary.avgAge || "—"} años.
         </Text>
       </Surface>
+
+      {/* Al pie y en secundario: el registro no es armar la reta de hoy, es a
+          dónde se va cuando alguien discute si el reparto se repite o si a él
+          nunca le toca. Aquí lo encuentra quien lo busca sin estorbar al que
+          solo viene a convocar. */}
+      <Button
+        icon="trophy"
+        label="Ver historial de retas"
+        onPress={() => router.push("/retas")}
+        size="md"
+        variant="ghost"
+      />
     </ScrollView>
   );
 }

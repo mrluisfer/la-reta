@@ -6,6 +6,16 @@ Lo que va cambiando en la app y en la web, contado para quien juega.
 
 ### ✨ Nuevo
 
+- **Las casacas se sortean desde el teléfono.** Ruleta con todos los de la plantilla, con la misma regla de siempre: quien lavó las dos últimas retas queda en descanso y sale en gris. Gira con el pulgar y hace tic cada vez que pasa un nombre. A diferencia de la web, **el turno no se guarda solo**: sale el elegido y tú confirmas — en la cancha pasa a menudo que el que salió ya se fue, y volver a girar tiene que costar un toque. Debajo, a quién le ha tocado y cuándo.
+
+- **Registro de retas.** Todo lo que ha ido repartiendo el generador, en gráficas: qué tan parejas van saliendo las retas, con cuántos equipos se juega normalmente, quién sale más convocado y qué parejas siempre caen en el mismo equipo. Se abre desde el carrusel de Inicio y desde _Armar reta_.
+
+---
+
+## Publicado — septiembre 2026
+
+### ✨ Nuevo
+
 - **Tu ficha ahora cuenta tu historia.** Entra a cualquier jugador y verás su palmarés —figuras, golazos, bloopers y las veces que le tocó lavar las casacas—, su balance de partidos con los últimos resultados, con quién suele jugar y cuántas ganan juntos. Todo estaba en la base desde hace meses; hasta ahora no se veía.
 
 - **Cómo ha evolucionado cada jugador.** Una gráfica con su overall a lo largo del tiempo y, debajo, el diario de cada ajuste: qué atributo subió o bajó y cuánto. Se acabó el "a mí me bajaron el tiro y no me di cuenta".

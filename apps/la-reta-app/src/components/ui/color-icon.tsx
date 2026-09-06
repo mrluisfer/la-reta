@@ -36,7 +36,8 @@ export type ColorIconName =
   | "people"
   | "star"
   | "trophy"
-  | "goal";
+  | "goal"
+  | "history";
 
 export function ColorIcon({
   name,
@@ -53,7 +54,62 @@ export function ColorIcon({
   if (name === "star") return <StarMark size={size} />;
   if (name === "trophy") return <TrophyMark size={size} />;
   if (name === "goal") return <GoalMark size={size} />;
+  if (name === "history") return <HistoryMark size={size} />;
   return <BulbMark size={size} />;
+}
+
+/**
+ * El reloj con la flecha hacia atrás: mirar lo que ya pasó.
+ *
+ * Llega con el azul eléctrico y el morado del original y sale en la familia de
+ * la casa: el aro y la flecha en el degradado turquesa → verde acento, las
+ * manecillas en ámbar. Los cuatro tonos ya existen en la app —el turquesa es el
+ * del anillo de formatos, el verde es el acento, y el ámbar es el de las
+ * estrellas y las casacas—, así que la ficha entra en el carrusel sin traer una
+ * paleta nueva.
+ *
+ * El contraste va a propósito entre las dos piezas: manecillas ámbar sobre aro
+ * turquesa. Con la misma familia en las dos, a 30 pt el reloj se leía como un
+ * círculo con manchas.
+ */
+function HistoryMark({ size }: { size: number }) {
+  return (
+    <Svg height={size} viewBox="0 0 24 24" width={size}>
+      <Defs>
+        <LinearGradient
+          gradientUnits="userSpaceOnUse"
+          id="historyHands"
+          x1="10.156"
+          x2="22.094"
+          y1="18.45"
+          y2="13.414"
+        >
+          <Stop stopColor="#FBBF24" />
+          <Stop offset="1" stopColor="#B45309" />
+        </LinearGradient>
+        <LinearGradient
+          gradientUnits="userSpaceOnUse"
+          id="historyDial"
+          x1="3"
+          x2="7.831"
+          y1="4.059"
+          y2="24.288"
+        >
+          <Stop stopColor="#5EEAD4" />
+          <Stop offset="1" stopColor="#007A55" />
+        </LinearGradient>
+      </Defs>
+
+      <Path
+        d="M12 7a1 1 0 0 1 1 1v3h2a1 1 0 1 1 0 2h-3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1"
+        fill="url(#historyHands)"
+      />
+      <Path
+        d="M12 5a7 7 0 1 1-6.946 6.124a1 1 0 1 0-1.984-.248Q3 11.43 3 12a9 9 0 1 0 4-7.484V4a1 1 0 0 0-2 0v3a1 1 0 0 0 1 1h3a1 1 0 0 0 0-2h-.608A6.97 6.97 0 0 1 12 5"
+        fill="url(#historyDial)"
+      />
+    </Svg>
+  );
 }
 
 /**

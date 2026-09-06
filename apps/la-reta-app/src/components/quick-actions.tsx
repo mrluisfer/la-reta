@@ -51,7 +51,7 @@ type Action = {
   mark: ColorIconName;
   label: string;
   /** Ruta de la app, o camino de la web que se abre en el navegador. */
-  href?: "/calendario" | "/reta";
+  href?: "/calendario" | "/reta" | "/casacas" | "/retas";
   webPath?: string;
 };
 
@@ -71,7 +71,8 @@ const ACTIONS: Action[] = [
     href: "/calendario",
   },
   { key: "once", mark: "pitch", label: "Once ideal", href: "/reta" },
-  { key: "casacas", mark: "jersey", label: "Casacas", webPath: "/casacas" },
+  { key: "casacas", mark: "jersey", label: "Casacas", href: "/casacas" },
+  { key: "registro", mark: "history", label: "Registro", href: "/retas" },
   { key: "ideas", mark: "bulb", label: "Ideas", webPath: "/ideas" },
 ];
 

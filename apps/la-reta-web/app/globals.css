@@ -561,31 +561,63 @@
 
   /**
    * Tarjeta de premio de la votación (golazo / error / figura), bañada por el
-   * color de su categoría (`--accent`).
+   * color de su categoría (`--award`).
    *
    * El color entra como un halo que cae desde arriba, no como una franja
    * pastel pegada al borde: así la tarjeta entera pertenece a su categoría y a
    * un metro de la pantalla se distingue el golazo del error sin leer la
    * etiqueta.
+   *
+   * El nombre de la variable es `--award` y no `--accent` a propósito:
+   * `--accent` es un token del tema (lo consumen `bg-accent` y compañía), y
+   * redefinirlo aquí se lo cambiaba a todo lo que colgara de la tarjeta.
+   *
+   * Ojo con `box-shadow`: `Card` ya trae `ring-1`, que también es una
+   * `box-shadow`. Por eso la tarjeta va con `ring-0` y este anillo es el
+   * único dueño de la propiedad; si no, cuál de los dos gana depende del
+   * orden en que salgan las utilidades, que es justo lo que no queremos.
    */
   .award-card {
     background-image: radial-gradient(
       120% 80% at 50% 0%,
-      color-mix(in oklab, var(--accent) 16%, transparent) 0%,
+      color-mix(in oklab, var(--award) 16%, transparent) 0%,
       transparent 70%
     );
-    box-shadow: inset 0 0 0 1px
-      color-mix(in oklab, var(--accent) 30%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, var(--award) 30%, transparent),
+      var(--shadow-xs);
     transition:
       box-shadow 300ms ease-out,
-      transform 300ms ease-out;
+      translate 300ms ease-out;
+  }
+
+  /* El acento se enciende igual con el puntero que con el teclado: la tarjeta
+     es un enlace, y quien navega con Tab merece la misma señal. */
+  .award-card:focus-within {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, var(--award) 55%, transparent),
+      0 12px 28px -12px color-mix(in oklab, var(--award) 45%, transparent);
   }
 
   @media (hover: hover) {
     .award-card:hover {
       box-shadow:
-        inset 0 0 0 1px color-mix(in oklab, var(--accent) 55%, transparent),
-        0 12px 28px -12px color-mix(in oklab, var(--accent) 45%, transparent);
+        inset 0 0 0 1px color-mix(in oklab, var(--award) 55%, transparent),
+        0 12px 28px -12px color-mix(in oklab, var(--award) 45%, transparent);
+    }
+  }
+
+  /* `translate` y no `transform`: la propiedad independiente no pisa ninguna
+     matriz que Motion o Tailwind puedan estar escribiendo en el mismo nodo. */
+  @media (prefers-reduced-motion: no-preference) {
+    .award-card:focus-within {
+      translate: 0 -4px;
+    }
+
+    @media (hover: hover) {
+      .award-card:hover {
+        translate: 0 -4px;
+      }
     }
   }
 

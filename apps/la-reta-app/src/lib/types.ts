@@ -107,6 +107,23 @@ export interface PlayerComment {
   mine: boolean;
 }
 
+/**
+ * Un turno de casacas (/api/v1/casacas).
+ *
+ * `playerId` es `null` cuando le tocó a alguien de última hora: los invitados
+ * lavan igual, pero no tienen ficha en la plantilla.
+ */
+export interface CasacaTurn {
+  id: number;
+  playerId: number | null;
+  displayName: string;
+  photoUrl: string | null;
+  isGuest: boolean;
+  /** Quién giró la ruleta, si había sesión. */
+  spunByName: string | null;
+  createdAt: string;
+}
+
 export interface MatchTeam {
   key: string;
   name: string;
