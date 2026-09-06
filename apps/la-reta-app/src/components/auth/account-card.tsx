@@ -1,7 +1,7 @@
 import { useAuth, useUser } from "@clerk/expo";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -17,10 +17,16 @@ import { initials } from "@/lib/photos";
  * (ver `isClerkConfigured`). `isLoaded` va antes que `isSignedIn`: durante el
  * primer instante la sesión aún se está restaurando del keychain y dar por
  * hecho que no hay nadie haría parpadear "Sin sesión" en cada arranque.
+ *
+ * Con sesión, **la tarjeta entera lleva a la hoja de cuenta** en vez de traer
+ * un "Cerrar sesión" colgando. Cerrar sesión es lo que menos se hace de todo lo
+ * que se puede hacer con una cuenta, y tenerlo como único botón obligaba a que
+ * cualquier cosa nueva —cambiar la foto, borrar la cuenta— naciera al lado de
+ * él. La tarjeta pasa a ser lo que parece: la puerta a tu cuenta.
  */
 export function AccountCard() {
   const router = useRouter();
-  const { isLoaded, isSignedIn, signOut } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
 
   if (!isLoaded) {
@@ -42,12 +48,19 @@ export function AccountCard() {
   const email = user?.primaryEmailAddress?.emailAddress ?? "";
 
   return (
-    <Surface style={{ gap: Spacing.four, padding: Spacing.four }}>
-      <View
+    <Pressable
+      accessibilityHint="Ver y cambiar los datos de tu cuenta"
+      accessibilityLabel={displayName}
+      accessibilityRole="button"
+      onPress={() => router.push("/cuenta")}
+      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+    >
+      <Surface
         style={{
           flexDirection: "row",
           alignItems: "center",
           gap: Spacing.three,
+          padding: Spacing.four,
         }}
       >
         <View
@@ -84,21 +97,15 @@ export function AccountCard() {
             {displayName}
           </Text>
           {email ? (
-            <Text numberOfLines={1} selectable tone="muted" variant="caption">
+            <Text numberOfLines={1} tone="muted" variant="caption">
               {email}
             </Text>
           ) : null}
         </View>
-      </View>
 
-      <Button
-        label="Cerrar sesión"
-        onPress={() => signOut()}
-        size="md"
-        style={{ alignSelf: "flex-start" }}
-        variant="ghost"
-      />
-    </Surface>
+        <Icon color={Palette.inkFaint} name="chevron" size={16} />
+      </Surface>
+    </Pressable>
   );
 }
 

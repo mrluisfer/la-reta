@@ -1,11 +1,14 @@
+import { useUser } from "@clerk/expo";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { Fragment } from "react";
 import { Pressable, View } from "react-native";
 
 import { useTabActionValue, type TabAction } from "@/components/tab-action";
+import { isClerkConfigured } from "@/components/auth-provider";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { Palette, Spacing } from "@/constants/theme";
+import { API_URL } from "@/lib/api";
 
 /**
  * Barra de pestañas nativa. En iOS 26 se dibuja con liquid glass.
@@ -23,8 +26,13 @@ import { Palette, Spacing } from "@/constants/theme";
  * abierta —el hueco que en Mail ocupa el botón de redactar—. Se encoge y crece
  * con la barra, así que la acción siempre está donde el pulgar ya estaba.
  */
+/** Lado del retrato en la barra, en puntos. Sin esta pista, iOS dibuja la
+ *  imagen a su tamaño natural y se come la fila entera. */
+const AVATAR_PT = 28;
+
 export default function AppTabs() {
   const actions = useTabActionValue();
+  const avatar = useAvatarIcon();
 
   return (
     <NativeTabs
@@ -77,13 +85,24 @@ export default function AppTabs() {
 
       <NativeTabs.Trigger name="(perfil)">
         <NativeTabs.Trigger.Label>Perfil</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          md="account_circle"
-          sf={{
-            default: "person.crop.circle",
-            selected: "person.crop.circle.fill",
-          }}
-        />
+        {/* Con sesión, tu cara en lugar del monigote. `renderingMode="original"`
+            es obligatorio: por defecto iOS trata el icono de una pestaña como
+            plantilla y lo pinta de un solo color, así que la foto saldría como
+            una silueta verde. */}
+        {avatar === null ? (
+          <NativeTabs.Trigger.Icon
+            md="account_circle"
+            sf={{
+              default: "person.crop.circle",
+              selected: "person.crop.circle.fill",
+            }}
+          />
+        ) : (
+          <NativeTabs.Trigger.Icon
+            renderingMode="original"
+            src={{ uri: avatar, width: AVATAR_PT, height: AVATAR_PT }}
+          />
+        )}
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -208,4 +227,24 @@ function ScreenAction({
       </Text>
     </Pressable>
   );
+}
+
+/**
+ * La foto de la cuenta para la pestaña de perfil, o `null` si no hay.
+ *
+ * No apunta directo a Clerk sino a nuestro `/api/v1/avatar`, que la devuelve
+ * recortada en círculo. La barra de iOS dibuja la imagen tal cual —no la
+ * redondea ni la recorta—, así que una foto cuadrada se vería cuadrada entre
+ * iconos redondos, y enmascararla en el teléfono pediría otra librería nativa.
+ *
+ * Va en un hook aparte porque `useUser` solo existe bajo `ClerkProvider`, que
+ * se monta únicamente si hay llave publicable.
+ */
+function useAvatarIcon(): string | null {
+  const { user } = useUser();
+
+  if (!(isClerkConfigured && user?.imageUrl)) {
+    return null;
+  }
+  return `${API_URL}/api/v1/avatar?u=${encodeURIComponent(user.imageUrl)}`;
 }

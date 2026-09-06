@@ -35,6 +35,7 @@ export const Palette = {
   accentLine: "rgba(0, 122, 85, 0.22)",
 
   danger: "#E7000B",
+  dangerInk: "#FFF1F2",
 } as const;
 
 export type Tone = keyof typeof Tones;
@@ -46,6 +47,7 @@ export const Tones = {
   accent: Palette.accent,
   onAccent: Palette.accentInk,
   danger: Palette.danger,
+  onDanger: Palette.dangerInk,
 } as const;
 
 /**

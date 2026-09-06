@@ -1,9 +1,11 @@
+import { useAuth } from "@clerk/expo";
 import { POSITIONS, type Position } from "@repo/reta/positions";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { isClerkConfigured } from "@/components/auth-provider";
 import { Notice } from "@/components/notice";
 import { PhotoField } from "@/components/photo-field";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ import { personNameError } from "@repo/reta/names";
  */
 export default function RegistroScreen() {
   const router = useRouter();
+  const signedIn = useSignedIn();
   const insets = useSafeAreaInsets();
 
   const [name, setName] = useState("");
@@ -224,18 +227,23 @@ export default function RegistroScreen() {
             onPress={submit}
           />
 
-          {/* Entrar sin perder lo escrito.
+          {/* Entrar sin perder lo escrito, y solo si hace falta: con sesión
+              abierta, ofrecer "ya tengo cuenta" es preguntarle a alguien si
+              existe.
+
               `/sign-in` vive en el stack raíz, así que se apila **encima** de
               esta hoja en vez de sustituirla: al cerrar el acceso, este
               formulario sigue montado con todo lo tecleado. Reabrirlo desde
               cero después de escribir seis campos es de las cosas que hacen
               abandonar un alta. */}
-          <Button
-            icon="person"
-            label="Ya tengo cuenta"
-            onPress={() => router.push("/sign-in")}
-            variant="plain"
-          />
+          {signedIn ? null : (
+            <Button
+              icon="person"
+              label="Ya tengo cuenta"
+              onPress={() => router.push("/sign-in")}
+              variant="plain"
+            />
+          )}
         </>
       )}
     </ScrollView>
@@ -279,4 +287,16 @@ function Sent({ onClose }: { onClose: () => void }) {
       <Button label="Listo" onPress={onClose} />
     </View>
   );
+}
+
+/**
+ * Si hay sesión.
+ *
+ * Envuelto en su propio hook porque `useAuth` solo existe bajo `ClerkProvider`,
+ * y este se monta solo cuando hay llave publicable. Sin llave se responde que
+ * no hay sesión, que es la verdad y además el camino que enseña el botón.
+ */
+function useSignedIn(): boolean {
+  const { isSignedIn } = useAuth();
+  return isClerkConfigured && isSignedIn === true;
 }

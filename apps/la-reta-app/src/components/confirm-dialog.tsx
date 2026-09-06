@@ -14,17 +14,24 @@ import { Palette, Radius, Shadow, Spacing } from "@/constants/theme";
  *
  * El detalle dice qué va a pasar con números —cuántos equipos, cuánta gente—
  * en vez de "¿estás seguro?", que no informa de nada.
+ *
+ * Con `destructive` el botón de confirmar se pone rojo. No es decoración: en un
+ * par de botones iguales el pulgar va al de la derecha por costumbre, y el color
+ * es lo único que frena esa costumbre cuando lo de la derecha borra algo.
  */
 export function ConfirmDialog({
   title,
   detail,
   confirmLabel,
+  destructive = false,
   onConfirm,
   onClose,
 }: {
   title: string;
   detail: string;
   confirmLabel: string;
+  /** Cuando confirmar quita algo, y no solo lo reemplaza. */
+  destructive?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -77,6 +84,7 @@ export function ConfirmDialog({
                 label={confirmLabel}
                 onPress={confirm}
                 size="md"
+                variant={destructive ? "danger" : "primary"}
               />
             </View>
           </View>

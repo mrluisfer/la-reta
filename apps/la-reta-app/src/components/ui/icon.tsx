@@ -38,6 +38,7 @@ export type IconName =
   | "trash"
   | "refresh"
   | "camera"
+  | "download"
   | "eye"
   | "eye-off"
   | "pin";
@@ -84,6 +85,18 @@ export function Icon({
           />
           <Circle cx={12} cy={12} r={3.2} {...stroke} />
           {name === "eye-off" ? <Path d="M4 20 L20 4" {...stroke} /> : null}
+        </>
+      ) : null}
+
+      {name === "download" ? (
+        <>
+          {/* La bandeja abierta por arriba y la flecha entrando en ella: es el
+              gesto de guardar, no el de mover algo hacia abajo. */}
+          <Path
+            d="M4 15.5v2.6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.6"
+            {...stroke}
+          />
+          <Path d="M12 3.8v11.4m-4.4-4.4L12 15.2l4.4-4.4" {...stroke} />
         </>
       ) : null}
 

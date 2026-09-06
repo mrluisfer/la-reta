@@ -41,6 +41,7 @@ export function makeGuest(
     position2: null,
     nationality: "mx",
     photoUrl: null,
+    birthDate: null,
     age: 25,
     heightCm: 175,
     weightKg: 70,

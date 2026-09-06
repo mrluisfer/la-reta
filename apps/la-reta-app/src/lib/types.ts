@@ -45,11 +45,22 @@ export interface Player extends Record<StatKey, number> {
   position2: Position | null;
   nationality: string;
   photoUrl: string | null;
+  /**
+   * Fecha de nacimiento ("1990-03-12") o `null` en las fichas viejas, que solo
+   * tienen la edad suelta. Es la fuente: el servidor deriva `age` de aquí
+   * siempre que exista, así que editar los años sin tocarla no serviría de nada.
+   */
+  birthDate: string | null;
   age: number;
   heightCm: number;
   weightKg: number;
   preferredFoot: "left" | "right" | "both";
   overall: number;
+  /**
+   * Cuenta de Clerk dueña de la ficha, o `null` si nadie la ha reclamado. Es lo
+   * que decide si se ofrece "esta es mi ficha".
+   */
+  clerkUserId?: string | null;
 }
 
 export interface MatchTeam {

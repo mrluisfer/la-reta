@@ -91,6 +91,47 @@ export async function loadOwnedPlayerId(): Promise<number | null> {
   }
 }
 
+/**
+ * Vincula una ficha a la cuenta que lo pide.
+ *
+ * El servidor decide: una ficha con dueño no se le quita a nadie y una cuenta
+ * no puede tener dos. Aquí solo se manda el id y se deja que conteste.
+ */
+/**
+ * Los datos de ficha que su dueño puede cambiar.
+ *
+ * Los seis atributos no están, y no es un olvido: los pone la reta jugando, y
+ * el servidor los relee de la fila aunque el cliente los mande. Aquí ni se
+ * ofrecen para que la interfaz cuente la misma regla que la API.
+ */
+export type PlayerEdit = {
+  name: string;
+  displayName: string;
+  position: Position;
+  position2: string;
+  preferredFoot: "left" | "right" | "both";
+  nationality: string;
+  photoUrl: string;
+  birthDate: string;
+  age: number;
+  heightCm: number;
+  weightKg: number;
+};
+
+export async function savePlayerInfo(
+  playerId: number,
+  edit: PlayerEdit
+): Promise<void> {
+  await request(`/api/v1/players/${playerId}`, {
+    method: "PATCH",
+    body: edit,
+  });
+}
+
+export async function claimPlayer(playerId: number): Promise<void> {
+  await request(`/api/v1/players/${playerId}/claim`, { method: "POST" });
+}
+
 export async function sendSignup(input: SignupInput): Promise<void> {
   await request<{ id: number }>("/api/v1/player-signups", {
     method: "POST",
