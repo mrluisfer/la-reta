@@ -468,24 +468,9 @@
    CSS moderno: animaciones que no cuestan main thread
    ========================================================================== */
 
-/* Propiedades registradas: sin @property el navegador interpola un gradiente
-   como si fuera texto (o sea, no lo interpola) y el ángulo salta. Con un tipo
-   declarado sí se puede animar en el compositor. */
-@property --ring-angle {
-  inherits: false;
-  initial-value: 0deg;
-  syntax: "<angle>";
-}
-
-@property --sweep-x {
-  inherits: false;
-  initial-value: -60%;
-  syntax: "<percentage>";
-}
-
 @keyframes spin-ring {
   to {
-    --ring-angle: 360deg;
+    rotate: 360deg;
   }
 }
 
@@ -698,27 +683,35 @@
   }
 
   /**
-   * Aro giratorio para el jugador destacado. El gradiente cónico se anima por
-   * el ángulo registrado arriba (con @property; sin registrar, un ángulo no
-   * interpola). La máscara recorta el interior para que quede solo el borde:
-   * con `z-index: -1` el pseudo se pintaba ENCIMA del fondo de la tarjeta y la
-   * teñía entera. No toca layout, así que no hay reflow.
+   * Aro giratorio para el jugador destacado.
+   *
+   * El barrido lo da una capa ya pintada que gira con `rotate`, no un
+   * `conic-gradient` cuyo ángulo se anime. Animar el ángulo —que es lo que
+   * hacía esto con `@property --ring-angle`— obliga a repintar el degradado en
+   * CADA fotograma y para siempre: una propiedad personalizada no se compone
+   * por mucho que esté registrada; registrarla solo consigue que interpole.
+   * Girar una capa que ya está rasterizada sí lo resuelve el compositor, y a la
+   * vista es lo mismo.
+   *
+   * Hacen falta dos capas y por eso hay un `<span>` de verdad: la máscara tiene
+   * que quedarse quieta recortando el borde mientras el degradado gira por
+   * debajo. Con la máscara en el mismo elemento que gira, lo que rota es la
+   * forma del aro, no el barrido.
+   *
+   * La máscara recorta el interior para que quede solo el borde: con
+   * `z-index: -1` el pseudo se pintaba ENCIMA del fondo de la tarjeta y la
+   * teñía entera.
    */
   .crack-ring {
     position: relative;
   }
 
-  .crack-ring::before {
+  .crack-ring-glow {
     position: absolute;
+    z-index: 0;
+    overflow: hidden;
     padding: 1.5px;
     border-radius: inherit;
-    background: conic-gradient(
-      from var(--ring-angle),
-      transparent 0deg,
-      var(--color-primary) 60deg,
-      transparent 140deg,
-      transparent 360deg
-    );
     content: "";
     inset: -1.5px;
     mask:
@@ -728,8 +721,28 @@
     pointer-events: none;
   }
 
+  /* 300% en los dos lados: al girar sobre su centro, la capa tiene que seguir
+     tapando la tarjeta en cualquier ángulo, y el círculo que barre un
+     rectángulo 3w×3h cubre de sobra la diagonal de uno w×h. `translate` la
+     centra y la animación solo toca `rotate`, así que no se pisan. */
+  .crack-ring-glow::before {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 300%;
+    height: 300%;
+    background: conic-gradient(
+      transparent 0deg,
+      var(--color-primary) 60deg,
+      transparent 140deg,
+      transparent 360deg
+    );
+    content: "";
+    translate: -50% -50%;
+  }
+
   @media (prefers-reduced-motion: no-preference) {
-    .crack-ring::before {
+    .crack-ring-glow::before {
       animation: spin-ring 6s linear infinite;
     }
   }

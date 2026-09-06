@@ -5,8 +5,13 @@ import { positionGroup, type PositionGroup } from "@/lib/constants";
 import { TEAM_COLORS_LIGHT } from "@/lib/teams";
 import { initials } from "@/lib/format";
 import { isGuest } from "@/lib/guests";
+import { isOptimizablePhoto } from "@/lib/photo";
 import type { Lineup } from "@/lib/team-balancer";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
+
+/** El diámetro del avatar en la cancha (`size-11`), en px. */
+const AVATAR_PX = 44;
 
 // x% of the pitch per line, for each side (B mirrored toward the right goal).
 const BANDS_A: Record<PositionGroup, number> = {
@@ -50,71 +55,60 @@ function place(lineups: Lineup[], side: "A" | "B"): Placed[] {
   return placed;
 }
 
-function Token({
+const tokenLayout = cn(
+  "absolute flex flex-col items-center gap-1",
+  "-translate-x-1/2 -translate-y-1/2"
+);
+
+/**
+ * Una ficha en la cancha.
+ *
+ * Cuando se puede intercambiar es un `<button>` de verdad, no un `<div>` con
+ * `draggable`: arrastrar es lo único que había y con el teclado (o en un lector
+ * de pantalla) no había forma de mover a nadie. Siendo botón, el mismo
+ * `onClick` que dispara el ratón lo disparan Enter y Espacio gratis — se elige
+ * una ficha, se elige la segunda y se cambian. El arrastre sigue igual para
+ * quien use el ratón.
+ */
+const Token = ({
   p,
   x,
   y,
   color,
   onSwap,
+  picked = false,
+  onPick,
 }: {
-  p: Placed;
-  x: number;
-  y: number;
-  color: string;
-  onSwap?: (fromId: number, toId: number) => void;
-}) {
+  readonly p: Placed;
+  readonly x: number;
+  readonly y: number;
+  readonly color: string;
+  readonly onSwap?: (fromId: number, toId: number) => void;
+  /** Esta ficha está elegida y espera con quién cambiarse. */
+  readonly picked?: boolean;
+  readonly onPick?: (id: number) => void;
+}) => {
   const player = p.lineup.player;
-  const draggable = Boolean(onSwap);
+  const swappable = Boolean(onSwap);
   const [over, setOver] = React.useState(false);
-  return (
-    <div
-      className={cn(
-        "absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1",
-        draggable && "cursor-grab active:cursor-grabbing",
-      )}
-      style={{ left: `${x}%`, top: `${y}%` }}
-      draggable={draggable}
-      onDragStart={
-        draggable
-          ? (e) => {
-              e.dataTransfer.setData("text/plain", String(player.id));
-              e.dataTransfer.effectAllowed = "move";
-            }
-          : undefined
-      }
-      onDragOver={
-        draggable
-          ? (e) => {
-              e.preventDefault();
-              setOver(true);
-            }
-          : undefined
-      }
-      onDragLeave={draggable ? () => setOver(false) : undefined}
-      onDrop={
-        draggable
-          ? (e) => {
-              e.preventDefault();
-              setOver(false);
-              const fromId = Number(e.dataTransfer.getData("text/plain"));
-              if (fromId && fromId !== player.id) onSwap!(fromId, player.id);
-            }
-          : undefined
-      }
-    >
+  const body = (
+    <>
       <div className="relative">
         <div
           className={cn(
             "size-11 overflow-hidden rounded-full border-2 bg-neutral-900 transition-shadow",
-            over && "ring-2 ring-white ring-offset-1 ring-offset-black/40",
+            (over || picked) &&
+              "ring-2 ring-white ring-offset-1 ring-offset-black/40"
           )}
           style={{ borderColor: color }}
         >
           {player.photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={player.photoUrl}
               alt=""
+              width={AVATAR_PX}
+              height={AVATAR_PX}
+              unoptimized={!isOptimizablePhoto(player.photoUrl)}
               className="h-full w-full object-cover object-top"
             />
           ) : (
@@ -124,7 +118,7 @@ function Token({
           )}
         </div>
         <span
-          className="absolute -right-1 -bottom-1 grid min-w-5 place-items-center rounded-full px-1 font-mono text-[9px] font-bold text-white ring-2 ring-black/30"
+          className="absolute -right-1.5 -bottom-1.5 grid min-w-6 place-items-center rounded-full px-1 font-mono text-xs font-bold text-white ring-2 ring-black/30"
           style={{ backgroundColor: color }}
         >
           {player.overall}
@@ -137,29 +131,76 @@ function Token({
           // stay distinct: wrap to 2 lines instead of truncating it away.
           isGuest(player)
             ? "line-clamp-2 max-w-24 text-center break-words"
-            : "max-w-20 truncate",
+            : "max-w-20 truncate"
         )}
       >
         {player.displayName}
       </span>
-    </div>
+    </>
   );
-}
+
+  if (!swappable) {
+    return (
+      <div className={tokenLayout} style={{ left: `${x}%`, top: `${y}%` }}>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      aria-label={
+        picked
+          ? `${player.displayName}, elegido. Elige con quién cambiarlo.`
+          : `Cambiar a ${player.displayName} por otro jugador`
+      }
+      aria-pressed={picked}
+      className={cn(
+        tokenLayout,
+        "cursor-grab rounded active:cursor-grabbing",
+        "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+      )}
+      draggable
+      onClick={() => onPick?.(player.id)}
+      onDragLeave={() => setOver(false)}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", String(player.id));
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        const fromId = Number(e.dataTransfer.getData("text/plain"));
+        if (fromId && fromId !== player.id) {
+          onSwap?.(fromId, player.id);
+        }
+      }}
+      style={{ left: `${x}%`, top: `${y}%` }}
+      type="button"
+    >
+      {body}
+    </button>
+  );
+};
 
 export const MatchupPitch = React.forwardRef<
   HTMLDivElement,
   {
-    teamA: Lineup[];
-    teamB: Lineup[];
-    ratingA: number;
-    ratingB: number;
-    nameA?: string;
-    nameB?: string;
+    readonly teamA: Lineup[];
+    readonly teamB: Lineup[];
+    readonly ratingA: number;
+    readonly ratingB: number;
+    readonly nameA?: string;
+    readonly nameB?: string;
     /** Colores del par que se está mostrando (varían con 3+ equipos). */
-    colorA?: string;
-    colorB?: string;
+    readonly colorA?: string;
+    readonly colorB?: string;
     /** When set, tokens become draggable and dropping one on another swaps them. */
-    onSwap?: (fromId: number, toId: number) => void;
+    readonly onSwap?: (fromId: number, toId: number) => void;
   }
 >(function MatchupPitch(
   {
@@ -173,10 +214,24 @@ export const MatchupPitch = React.forwardRef<
     colorB = TEAM_COLORS_LIGHT.B,
     onSwap,
   },
-  ref,
+  ref
 ) {
   const a = place(teamA, "A");
   const b = place(teamB, "B");
+
+  // Quién espera pareja. Vive aquí y no en el token porque un cambio son dos
+  // fichas: la primera se queda marcada hasta que se elige la segunda.
+  const [pickedId, setPickedId] = React.useState<number | null>(null);
+  const pick = (id: number) => {
+    if (pickedId === null) {
+      setPickedId(id);
+      return;
+    }
+    if (pickedId !== id) {
+      onSwap?.(pickedId, id);
+    }
+    setPickedId(null);
+  };
   const teamAName = nameA?.trim() || "Equipo A";
   const teamBName = nameB?.trim() || "Equipo B";
 
@@ -214,7 +269,7 @@ export const MatchupPitch = React.forwardRef<
           >
             {teamAName}
           </p>
-          <p className="font-mono text-[11px] font-semibold tracking-[0.18em] text-white/70 tabular-nums">
+          <p className="font-mono text-xs font-semibold tracking-[0.18em] text-white/70 tabular-nums">
             {ratingA}
           </p>
         </div>
@@ -228,7 +283,7 @@ export const MatchupPitch = React.forwardRef<
           >
             {teamBName}
           </p>
-          <p className="font-mono text-[11px] font-semibold tracking-[0.18em] text-white/70 tabular-nums">
+          <p className="font-mono text-xs font-semibold tracking-[0.18em] text-white/70 tabular-nums">
             {ratingB}
           </p>
         </div>
@@ -237,22 +292,26 @@ export const MatchupPitch = React.forwardRef<
       {/* Players */}
       {a.map((p) => (
         <Token
+          color={colorA}
           key={p.lineup.player.id}
+          onPick={pick}
+          onSwap={onSwap}
           p={p}
+          picked={pickedId === p.lineup.player.id}
           x={p.x}
           y={p.y}
-          color={colorA}
-          onSwap={onSwap}
         />
       ))}
       {b.map((p) => (
         <Token
+          color={colorB}
           key={p.lineup.player.id}
+          onPick={pick}
+          onSwap={onSwap}
           p={p}
+          picked={pickedId === p.lineup.player.id}
           x={p.x}
           y={p.y}
-          color={colorB}
-          onSwap={onSwap}
         />
       ))}
 

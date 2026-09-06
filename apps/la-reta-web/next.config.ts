@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
         hostname: "*.public.blob.vercel-storage.com",
         pathname: "/**",
       },
+      // Los retratos de cuenta que sirve Clerk son de 1000x1000 y se pintan en
+      // avatares de 32 px. Sin declararlos aquí el optimizador los rechaza y
+      // el navegador se baja el original entero.
+      { protocol: "https", hostname: "img.clerk.com", pathname: "/**" },
+      { protocol: "https", hostname: "images.clerk.dev", pathname: "/**" },
     ],
   },
 };

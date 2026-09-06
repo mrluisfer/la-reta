@@ -106,7 +106,7 @@ const PlayerDetailPage = async ({
             queda a la vista junto con la carta mientras se hace scroll. */}
           <div className="mx-auto w-full max-w-[260px] space-y-3 md:sticky md:top-16 2xl:max-w-[300px]">
             <BackButton />
-            <FifaCard player={player} className="card-shine" />
+            <FifaCard className="card-shine" player={player} sizes="300px" />
           </div>
 
           <div className="space-y-6">

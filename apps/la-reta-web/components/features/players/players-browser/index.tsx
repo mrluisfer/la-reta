@@ -282,7 +282,11 @@ export const PlayersBrowser = ({
                       "ring-primary ring-offset-background ring-2 ring-offset-2"
                   )}
                 >
-                  <FifaCard player={player} className="card-shine" />
+                  <FifaCard
+                    className="card-shine"
+                    player={player}
+                    sizes="(min-width: 1536px) 17vw, (min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+                  />
                 </Link>
               </div>
             );

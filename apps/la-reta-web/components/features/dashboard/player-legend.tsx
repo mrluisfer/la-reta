@@ -6,7 +6,7 @@ import Image from "next/image";
 import { ChouchaLegend } from "./choucha-legend";
 
 /** Legendary player showcase — FIFA icon card aesthetic. */
-export function PlayerLegend() {
+export const PlayerLegend = () => {
   return (
     <Dialog>
       <DialogTrigger className="block w-full transition hover:brightness-110">
@@ -40,6 +40,7 @@ export function PlayerLegend() {
                   alt="Choucha — leyenda de la reta"
                   width={480}
                   height={720}
+                  sizes="(min-width: 640px) 176px, 112px"
                   className="h-full w-full object-cover object-top"
                   priority
                 />
@@ -73,4 +74,4 @@ export function PlayerLegend() {
       <ChouchaLegend />
     </Dialog>
   );
-}
+};

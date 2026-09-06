@@ -90,6 +90,16 @@ FIFA-style dashboard for organizing pickup football ("la reta"). **Next 16 App R
 - **Confirmaciones destructivas**: `<ConfirmDialog trigger title description onConfirm pending />` (`components/shared/confirm-dialog.tsx`) envuelve el `AlertDialog` de la app. Nada de `confirm()` nativo — se ve fuera de lugar, bloquea el hilo y solo admite una línea de texto.
 - **Prefer shadcn primitives over bespoke containers**: cards/panels use `Card`/`CardContent` (theme radius is `rounded-xl`; use `size="sm"` for compact density), empty states use `Empty`. Don't hand-roll `bg-card ring rounded-lg` boxes.
 
+### Imágenes: el tamaño se declara o se paga
+
+La foto de un jugador es la misma para todo — la carta FIFA, el círculo de 32 px de una alineación, la ficha de 300 px — y en el bucket mide hasta 1054×1492. El navegador la descomprime entera aunque la pinte del tamaño de una moneda: **~6 MB de bitmap por foto**, independientes de lo que pesó el WebP. Por eso el problema no se ve en la pestaña de red (17 avatares = 517 KB transferidos) y sí en la memoria: `/matches/[id]/detail` llegó a 93 MB solo en imágenes, y eso es lo que atasca el scroll en un teléfono. Medido con `[...document.images].reduce((a,i)=>a+i.naturalWidth*i.naturalHeight*4,0)`.
+
+- **Nunca un `<img>` crudo para una foto de jugador.** `next/image` o, si no cabe, la URL del optimizador.
+- **`FifaCard` pide `sizes` obligatorio**: es el ancho real en que se pinta, en la sintaxis de `sizes`. Sin él no hay default sano — la misma carta mide 112 px en el spotlight y 300 px en la ficha.
+- **`AvatarImage` reescribe su `src`** con `avatarSource()` (`lib/photo.ts`) al ancho del círculo. El default (128 px) cubre hasta `size-10`; **si el avatar es más grande —podio, tarjeta de MVP, ficha flotante, ganador de casacas— hay que pasarle `width`** o sale borroso. No se envuelve en `next/image` porque `Avatar.Image` de Base UI lleva la máquina de estados que decide cuándo enseñar el `AvatarFallback`.
+- **Un `next/image` sin `sizes` pide `w=3840`** y se trae el original: el `width` declarado solo fija la relación de aspecto, no lo que se descarga.
+- **`isOptimizablePhoto()` es la válvula de escape**: el formulario de jugador deja pegar una URL cualquiera, y el optimizador responde 400 a un host que no esté en `remotePatterns`. Esas van `unoptimized` / sin reescribir. Si añades un host a `next.config.ts`, añádelo también a `lib/photo.ts`.
+
 ### Movimiento y CSS moderno
 
 - **View transitions**: `<ViewTransition>` viene en el React que empaqueta el App Router (canary); **no instales `react@canary`**. `@types/react` todavía no lo declara, así que los tipos están en `types/react-view-transition.d.ts` (bórralo cuando upstream los incluya).
@@ -98,7 +108,10 @@ FIFA-style dashboard for organizing pickup football ("la reta"). **Next 16 App R
   - Header y sidebar llevan `viewTransitionName: "app-header" / "app-sidebar"` para quedarse fijos; las reglas están en `globals.css`.
   - **El morph de elemento compartido (`name` + `share`) NO funciona aquí**: todas las páginas de detalle son `force-dynamic`, así que el destino no se renderiza en el mismo commit que la navegación y el par nunca se forma (es la precondición que documenta Next). Comprobado en `/players` → `/players/[id]`. Volvería a ser viable si esas rutas se pudieran prefetchear.
 - **Animaciones sin JS**: `.reveal-on-scroll` usa `animation-timeline: view()` (corre en el compositor, sin IntersectionObserver). El estado inicial vive dentro de `@supports`, así que donde no haya soporte el contenido queda visible en vez de invisible.
-- `.card-shine` (banda diagonal al hover, solo `translate`) y `.crack-ring` (borde cónico animado con `@property --ring-angle` + máscara). El aro **necesita** la máscara: con `z-index: -1` el pseudo se pinta encima del fondo de la tarjeta y la tiñe entera.
+- `.card-shine` (banda diagonal al hover, solo `translate`) y `.crack-ring` (aro cónico giratorio, solo en la tarjeta de "El crack").
+  - **El aro son dos capas y por eso lleva un `<span class="crack-ring-glow">` de verdad**, no un pseudo suelto: la máscara que lo recorta al borde tiene que quedarse quieta mientras el degradado gira por debajo. Si la máscara va en el mismo elemento que rota, lo que gira es la forma del aro y no el barrido.
+  - **No animes el ángulo de un `conic-gradient`.** Esto lo hacía con `@property --ring-angle` y repintaba el degradado en cada fotograma, para siempre: una propiedad personalizada **no se compone** por mucho que esté registrada — registrarla solo consigue que interpole en vez de saltar. Ahora gira una capa ya rasterizada con `rotate`, que sí resuelve el compositor, y se ve idéntico (comparado fotograma a fotograma congelando las dos versiones al mismo `currentTime`).
+  - La capa que gira mide 300% × 300% porque al rotar sobre su centro tiene que seguir tapando la tarjeta en cualquier ángulo. Y **necesita la máscara**: con `z-index: -1` se pinta encima del fondo de la tarjeta y la tiñe entera.
 - Base moderna en `globals.css`: `color-scheme`, `interpolate-size: allow-keywords` (permite animar `height: auto`), `field-sizing: content` en textareas, `touch-action: manipulation`, `overscroll-behavior: contain` en overlays.
 - **Enlaces**: `BreadcrumbLink` renderiza un `<a>` plano — sin `render={<Link/>}` provoca **recarga completa**. Siempre `<BreadcrumbLink render={<Link href=... />}>`.
 - **Nunca anides `<a>` dentro de `<a>`** (p. ej. una tarjeta-enlace con un `<Button render={<Link/>}>` dentro): es HTML inválido, rompe la hidratación y hace que el botón interno navegue al destino de la tarjeta. Usa el patrón _stretched link_: la tarjeta `relative`, un único `<Link className="absolute inset-0">` como último hijo, y las acciones reales encima con `relative z-10`.
