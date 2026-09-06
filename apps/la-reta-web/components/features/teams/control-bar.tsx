@@ -42,7 +42,7 @@ export type MatchupView = "board" | "list";
  *  2. Ajustes de la generación — a quién convocas y en cuántos equipos.
  *  3. La acción — generar (y de ahí al live).
  */
-export function ControlBar({
+export const ControlBar = ({
   selectedCount,
   allSelected,
   hasSelection,
@@ -59,24 +59,24 @@ export function ControlBar({
   onGoLive,
   onRegistro,
 }: {
-  selectedCount: number;
-  allSelected: boolean;
-  hasSelection: boolean;
-  hasResult: boolean;
-  teamCount: number;
+  readonly selectedCount: number;
+  readonly allSelected: boolean;
+  readonly hasSelection: boolean;
+  readonly hasResult: boolean;
+  readonly teamCount: number;
   /** Tope real: no puede haber más equipos que convocados. */
-  maxTeams: number;
+  readonly maxTeams: number;
   /** Volver a repartir al editar la convocatoria o los invitados. */
-  resetOnEdit: boolean;
-  onResetOnEditChange: (value: boolean) => void;
-  onTeamCountChange: (count: number) => void;
-  onToggleAll: () => void;
-  onClear: () => void;
-  onGenerate: () => void;
-  generateDisabled: boolean;
-  onGoLive: () => void;
-  onRegistro: () => void;
-}) {
+  readonly resetOnEdit: boolean;
+  readonly onResetOnEditChange: (value: boolean) => void;
+  readonly onTeamCountChange: (count: number) => void;
+  readonly onToggleAll: () => void;
+  readonly onClear: () => void;
+  readonly onGenerate: () => void;
+  readonly generateDisabled: boolean;
+  readonly onGoLive: () => void;
+  readonly onRegistro: () => void;
+}) => {
   return (
     <Card size="sm">
       <CardContent className="space-y-3">
@@ -105,12 +105,12 @@ export function ControlBar({
                 <ListChecksIcon />
                 {allSelected ? "Quitar todos" : "Todos"}
               </Button>
-              {hasSelection && (
+              {hasSelection ? (
                 <Button variant="outline" onClick={onClear}>
                   <XIcon />
                   Limpiar
                 </Button>
-              )}
+              ) : null}
             </Field>
 
             <Field label="Equipos">
@@ -131,7 +131,7 @@ export function ControlBar({
               <ShuffleIcon />
               {hasResult ? "Regenerar" : "Generar equipos"}
             </Button>
-            {hasResult && (
+            {hasResult ? (
               <Button
                 variant="destructive"
                 className="flex-1 lg:flex-none"
@@ -140,22 +140,22 @@ export function ControlBar({
                 <RadioIcon />
                 Ir al live
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
       </CardContent>
     </Card>
   );
-}
+};
 
 /** Grupo de controles con su etiqueta, para que se lea qué hace cada cosa. */
-function Field({
+const Field = ({
   label,
   children,
 }: {
-  label: string;
-  children: React.ReactNode;
-}) {
+  readonly label: string;
+  readonly children: React.ReactNode;
+}) => {
   return (
     <div className="space-y-1.5">
       <span className="text-muted-foreground block text-[11px] font-semibold tracking-wide uppercase">
@@ -164,19 +164,19 @@ function Field({
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
   );
-}
+};
 
 /**
  * Casa de las preferencias del generador. Hoy vive una sola; el popover existe
  * para que las que vengan no vuelvan a llenar la barra.
  */
-function PreferencesPopover({
+const PreferencesPopover = ({
   resetOnEdit,
   onResetOnEditChange,
 }: {
-  resetOnEdit: boolean;
-  onResetOnEditChange: (value: boolean) => void;
-}) {
+  readonly resetOnEdit: boolean;
+  readonly onResetOnEditChange: (value: boolean) => void;
+}) => {
   return (
     <Popover>
       {/* Botón solo de icono: el tooltip dice qué abre. */}
@@ -211,21 +211,21 @@ function PreferencesPopover({
       </PopoverContent>
     </Popover>
   );
-}
+};
 
-function Setting({
+const Setting = ({
   id,
   label,
   hint,
   checked,
   onCheckedChange,
 }: {
-  id: string;
-  label: string;
-  hint: string;
-  checked: boolean;
-  onCheckedChange: (value: boolean) => void;
-}) {
+  readonly id: string;
+  readonly label: string;
+  readonly hint: string;
+  readonly checked: boolean;
+  readonly onCheckedChange: (value: boolean) => void;
+}) => {
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
@@ -239,31 +239,30 @@ function Setting({
       <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   );
-}
+};
 
 /**
- * Cuántos equipos generar. 2 es el default de siempre; 3+ arma una reta con
- * rotación (gana y se queda) que el live entiende.
+ * Cuántos equipos generar. 2 es el default de siempre; con 3+ el marcador en
+ * vivo enseña un botón de gol por equipo.
  */
-function TeamCountPicker({
+const TeamCountPicker = ({
   value,
   max,
   onChange,
 }: {
-  value: number;
-  max: number;
-  onChange: (count: number) => void;
-}) {
+  readonly value: number;
+  readonly max: number;
+  readonly onChange: (count: number) => void;
+}) => {
   const options = Array.from(
     { length: Math.max(2, Math.min(MAX_TEAMS, max)) - 1 },
-    (_, i) => i + 2,
+    (_, i) => i + 2
   );
-  const isEmpty = useMemo(() => options.length < 2, [options]);
+  const isEmpty = options.length < 2;
 
   return (
-    <div
-      className="bg-muted inline-flex items-center gap-0.5 rounded-xl p-0.5"
-      role="group"
+    <fieldset
+      className="bg-muted inline-flex items-center gap-0.5 rounded-xl border-0 p-0.5"
       aria-label="Número de equipos"
     >
       {options.map((n) => (
@@ -277,12 +276,12 @@ function TeamCountPicker({
             "rounded-[10px] px-3 py-1.5 font-mono text-xs font-bold tabular-nums transition-colors",
             value === n
               ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
+              : "text-muted-foreground hover:text-foreground"
           )}
         >
           {n}
         </button>
       ))}
-    </div>
+    </fieldset>
   );
-}
+};

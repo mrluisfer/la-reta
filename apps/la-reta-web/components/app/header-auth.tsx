@@ -1,5 +1,5 @@
 import { ButtonVariant } from "@/shared/types";
-import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
+import { Show, SignInButton, SignUpButton } from "@clerk/nextjs";
 import { LogInIcon, UserRoundPlusIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
@@ -35,11 +35,14 @@ const AuthAction = ({
   );
 };
 
-/** Header auth controls: sign-in / sign-up CTAs when signed out, avatar when in. */
+/**
+ * Solo los CTA de sesión cerrada: la cuenta iniciada vive en el pie del sidebar
+ * (`NavUser`). Entrar tiene que verse sin abrir nada; gestionar la cuenta no.
+ */
 export const HeaderAuth = () => {
   return (
-    <>
-      <Show when="signed-out">
+    <Show when="signed-out">
+      <>
         <AuthAction
           wrapper={SignInButton}
           icon={<LogInIcon />}
@@ -54,10 +57,7 @@ export const HeaderAuth = () => {
           variant="default"
           tooltip="Crea una cuenta para acceder a todas las funciones"
         />
-      </Show>
-      <Show when="signed-in">
-        <UserButton />
-      </Show>
-    </>
+      </>
+    </Show>
   );
 };

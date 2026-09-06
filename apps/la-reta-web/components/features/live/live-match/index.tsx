@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatApiDate } from "@/lib/dates";
 import { isGuest } from "@/lib/guests";
-import { initialPairing, rotate } from "@/lib/live-rotation";
+import { cn } from "@/lib/utils";
 import {
   currentGeneratedRetaIdAtom,
   EMPTY_LIVE_MATCH,
@@ -26,28 +26,56 @@ import {
 } from "@/lib/state/atoms";
 import { TEAM_COLORS, teamKeys, teamName, type TeamKey } from "@/lib/teams";
 import { useAtom, useAtomValue } from "jotai";
-import { FlagIcon, PlayIcon, RepeatIcon, TrashIcon } from "lucide-react";
+import { FlagIcon, PlusIcon, TrashIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
+import { addTransitionType, ViewTransition } from "react";
 import { toast } from "sonner";
+import { GoalButtons } from "./goal-buttons";
 import { GoalTimeline } from "./goal-timeline";
 import {
   countGoalsFor,
   createGoalEvent,
   formatGoalClock,
   formatGoalMinute,
-  getPlayerName,
-  getScorersSummary,
+  getScorers,
+  searchKey,
   tallyGoalsByPlayer,
-} from "./live-match-utils";
+} from "./live-match-utilities";
+import { LiveActions } from "./live-actions";
 import { LiveScoreboard } from "./live-scoreboard";
 import { ScorerPickerDrawer } from "./scorer-picker-drawer";
 import { StartMatchForm } from "./start-match-form";
-import type { LivePlayer } from "./types";
+import type { LiveGoal, LivePlayer } from "./types";
 import { useHydrated } from "./use-hydrated";
 import { useLiveMatchClock } from "./use-live-match-clock";
 
-export function LiveMatch({ players }: { players: LivePlayer[] }) {
+/**
+ * ¿Coincide el jugador con lo tecleado? Se mira el nombre y el apodo, ambos ya
+ * normalizados sin acentos por `searchKey`.
+ */
+function matchesSearch(player: LivePlayer, key: string) {
+  return (
+    searchKey(player.name).includes(key) ||
+    searchKey(player.displayName).includes(key)
+  );
+}
+
+/** Goles por jugador dentro de un equipo; vacío si no hay equipo que mirar. */
+function countGoalsByPlayer(goals: LiveGoal[], team: TeamKey | undefined) {
+  const counts = new Map<number, number>();
+  if (team == null) {
+    return counts;
+  }
+  for (const goal of goals) {
+    if (goal.team === team && goal.playerId != null) {
+      counts.set(goal.playerId, (counts.get(goal.playerId) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
+export const LiveMatch = ({ players }: { readonly players: LivePlayer[] }) => {
   const router = useRouter();
   const [live, setLive] = useAtom(liveMatchAtom);
   // Nombres y número de equipos se comparten con "armar equipos" (persistidos),
@@ -55,51 +83,57 @@ export function LiveMatch({ players }: { players: LivePlayer[] }) {
   const [names, setNames] = useAtom(teamNamesAtom);
   const [teamCount, setTeamCount] = useAtom(teamCountAtom);
   const [generatedRetaId, setGeneratedRetaId] = useAtom(
-    currentGeneratedRetaIdAtom,
+    currentGeneratedRetaIdAtom
   );
   const guests = useAtomValue(guestsAtom);
   const hydrated = useHydrated();
   const elapsedSec = useLiveMatchClock(live.active, live.startedAt);
   const [attrId, setAttrId] = React.useState<string | null>(null);
   const [filter, setFilter] = React.useState("");
-  const deferredFilter = React.useDeferredValue(filter.trim().toLowerCase());
+  const deferredFilter = React.useDeferredValue(searchKey(filter.trim()));
   const [pending, startTransition] = React.useTransition();
 
   // Roster + guests (última hora) share the scorer pool. Guests carry negative
   // ids; they're client-only until the match is finalized with their names.
-  const pool = React.useMemo<LivePlayer[]>(
-    () => [...players, ...guests.map((g) => ({ id: g.id, name: g.name }))],
-    [players, guests],
-  );
+  //
+  // Sin `useMemo` a propósito: son recorridos de veinte elementos, y este
+  // componente se re-renderiza una vez por segundo por el reloj. Memorizarlos
+  // cuesta más en listas de dependencias —y en riesgo de que se queden
+  // obsoletas— de lo que ahorra.
+  const pool: LivePlayer[] = [
+    ...players,
+    ...guests.map((g) => ({
+      id: g.id,
+      name: g.name,
+      displayName: g.displayName,
+      photoUrl: g.photoUrl,
+      position: g.position,
+      overall: g.overall,
+    })),
+  ];
 
-  const playersById = React.useMemo(
-    () => new Map(pool.map((player) => [player.id, player.name])),
-    [pool],
-  );
+  const playersById = new Map(pool.map((player) => [player.id, player]));
 
-  const sideOf = React.useCallback(
-    (key: TeamKey) =>
-      live.teams.find((t) => t.key === key) ?? { key, name: `Equipo ${key}` },
-    [live.teams],
-  );
-  const home = sideOf(live.home);
-  const away = sideOf(live.away);
+  const sideOf = (key: TeamKey) =>
+    live.teams.find((t) => t.key === key) ?? { key, name: `Equipo ${key}` };
 
-  const scoreHome = countGoalsFor(live.goals, live.home);
-  const scoreAway = countGoalsFor(live.goals, live.away);
+  /** Marcador y goleadores de cada equipo de la reta, en el orden de sus letras. */
+  const standings = live.teams.map((side) => ({
+    side,
+    score: countGoalsFor(live.goals, side.key),
+    scorers: getScorers(live.goals, side.key, playersById),
+  }));
 
-  const scorersHome = getScorersSummary(live.goals, live.home, playersById);
-  const scorersAway = getScorersSummary(live.goals, live.away, playersById);
-
-  const filteredPlayers = React.useMemo(() => {
-    if (!deferredFilter) return pool;
-    return pool.filter((player) =>
-      player.name.toLowerCase().includes(deferredFilter),
-    );
-  }, [pool, deferredFilter]);
+  // Nombre y apodo: en la cancha se le llama por el apodo y se le busca por él.
+  const filteredPlayers = deferredFilter
+    ? pool.filter((player) => matchesSearch(player, deferredFilter))
+    : pool;
 
   const attrGoal = live.goals.find((goal) => goal.id === attrId);
-  const attrTeam = attrGoal ? sideOf(attrGoal.team).name : "";
+  const attrSide = attrGoal ? sideOf(attrGoal.team) : null;
+
+  /** Goles que lleva cada jugador en el equipo del gol que se está asignando. */
+  const attrGoalCounts = countGoalsByPlayer(live.goals, attrGoal?.team);
 
   function setName(index: number, value: string) {
     setNames((prev) => {
@@ -120,15 +154,29 @@ export function LiveMatch({ players }: { players: LivePlayer[] }) {
     });
   }
 
+  /**
+   * Arrancar cambia la pantalla entera: el formulario cede el sitio al
+   * marcador. Va dentro de `startTransition` porque es lo único que activa un
+   * `<ViewTransition>` —un `setState` normal no anima nada— y lleva tipo propio
+   * para que el cambio de número de equipos, que pasa en la misma pantalla, no
+   * herede esta animación.
+   */
   function start() {
     const keys = teamKeys(teamCount);
-    setLive({
-      active: true,
-      teams: keys.map((key) => ({ key, name: teamName(names, key) })),
-      ...initialPairing(keys),
-      startedAt: Date.now(),
-      goals: [],
+    React.startTransition(() => {
+      addTransitionType("live-start");
+      setLive({
+        active: true,
+        teams: keys.map((key) => ({ key, name: teamName(names, key) })),
+        startedAt: Date.now(),
+        goals: [],
+      });
     });
+  }
+
+  /** Entra o sale un equipo: la rejilla del pre-partido se reacomoda animada. */
+  function changeTeamCount(next: number) {
+    React.startTransition(() => setTeamCount(next));
   }
 
   function addGoal(team: TeamKey) {
@@ -139,22 +187,6 @@ export function LiveMatch({ players }: { players: LivePlayer[] }) {
     }));
     setAttrId(goal.id);
     setFilter("");
-  }
-
-  function removeLast(team: TeamKey) {
-    setLive((state) => {
-      const lastIdx = [...state.goals]
-        .map((goal, index) => ({ goal, index }))
-        .reverse()
-        .find(({ goal }) => goal.team === team)?.index;
-
-      if (lastIdx == null) return state;
-
-      return {
-        ...state,
-        goals: state.goals.filter((_, index) => index !== lastIdx),
-      };
-    });
   }
 
   function removeGoal(id: string) {
@@ -168,7 +200,7 @@ export function LiveMatch({ players }: { players: LivePlayer[] }) {
     setLive((state) => ({
       ...state,
       goals: state.goals.map((goal) =>
-        goal.id === id ? { ...goal, playerId } : goal,
+        goal.id === id ? { ...goal, playerId } : goal
       ),
     }));
     setAttrId(null);
@@ -180,74 +212,60 @@ export function LiveMatch({ players }: { players: LivePlayer[] }) {
     setFilter("");
   }
 
-  /** Guarda el partido actual en el registro. Devuelve si salió bien. */
-  async function saveCurrent() {
-    const durationSec = live.startedAt
-      ? Math.floor((Date.now() - live.startedAt) / 1000)
-      : null;
-    // El partido siempre se guarda a dos lados: A = local, B = visitante.
-    // `teamAKey`/`teamBKey` dicen qué equipos de la reta eran.
-    const scorers = tallyGoalsByPlayer(live.goals).map((s) => {
-      const team = s.team === live.home ? ("A" as const) : ("B" as const);
-      return isGuest({ id: s.playerId })
-        ? {
-            playerId: null,
-            guestName: playersById.get(s.playerId) ?? "Invitado",
-            goals: s.goals,
-            team,
-          }
-        : { playerId: s.playerId, goals: s.goals, team };
-    });
-
-    const res = await createMatch({
-      playedAt: formatApiDate(live.startedAt ?? Date.now()),
-      teamAName: home.name,
-      teamBName: away.name,
-      teamAKey: live.home,
-      teamBKey: live.away,
-      scoreA: scoreHome,
-      scoreB: scoreAway,
-      balance: 50,
-      durationSec,
-      notes: "",
-      generatedRetaId,
-      scorers,
-    });
-
-    if (!res.ok) toast.error(res.error);
-    return res.ok;
-  }
-
+  /**
+   * Cierra la reta: UN registro con todos sus equipos y todos sus goles.
+   *
+   * `scorers[].team` lleva la letra real del equipo (A…F), no un "A"/"B" según
+   * quién fuera local: con tres o más equipos eso último atribuía los goles al
+   * lado equivocado. Los dos primeros equipos van además en las columnas de
+   * siempre porque `createMatch` solo mira `teams` a partir de tres.
+   */
   function finalize() {
     startTransition(async () => {
-      if (!(await saveCurrent())) return;
-      toast.success("Partido finalizado y guardado en el registro");
+      const durationSec = live.startedAt
+        ? Math.floor((Date.now() - live.startedAt) / 1000)
+        : null;
+
+      const scorers = tallyGoalsByPlayer(live.goals).map((s) =>
+        isGuest({ id: s.playerId })
+          ? {
+              playerId: null,
+              guestName: playersById.get(s.playerId)?.name ?? "Invitado",
+              goals: s.goals,
+              team: s.team,
+            }
+          : { playerId: s.playerId, goals: s.goals, team: s.team }
+      );
+
+      const res = await createMatch({
+        playedAt: formatApiDate(live.startedAt ?? Date.now()),
+        teamAName: standings[0]?.side.name ?? "Equipo A",
+        teamBName: standings[1]?.side.name ?? "Equipo B",
+        teamAKey: standings[0]?.side.key ?? "A",
+        teamBKey: standings[1]?.side.key ?? "B",
+        scoreA: standings[0]?.score ?? 0,
+        scoreB: standings[1]?.score ?? 0,
+        teams: standings.map(({ side, score }) => ({
+          key: side.key,
+          name: side.name,
+          score,
+        })),
+        balance: 50,
+        durationSec,
+        notes: "",
+        generatedRetaId,
+        scorers,
+      });
+
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+
+      toast.success("Reta guardada en el registro");
       setLive(EMPTY_LIVE_MATCH);
       setGeneratedRetaId(null);
       router.push("/matches");
-      router.refresh();
-    });
-  }
-
-  /** Guarda el partido y arranca el siguiente de la rotación (gana y se queda). */
-  function nextGame() {
-    startTransition(async () => {
-      if (!(await saveCurrent())) return;
-      const next = rotate(
-        { home: live.home, away: live.away, queue: live.queue },
-        scoreHome,
-        scoreAway,
-      );
-      setLive((state) => ({
-        ...state,
-        ...next,
-        startedAt: Date.now(),
-        goals: [],
-      }));
-      setAttrId(null);
-      toast.success(
-        `Guardado. Ahora: ${sideOf(next.home).name} vs ${sideOf(next.away).name}`,
-      );
       router.refresh();
     });
   }
@@ -258,186 +276,78 @@ export function LiveMatch({ players }: { players: LivePlayer[] }) {
     );
   }
 
+  // Las dos ramas llevan `key` distinta a propósito: con la misma, React ve un
+  // solo <ViewTransition> al que le cambian los hijos (un `update`, o sea nada)
+  // en vez del par salir/entrar que hace falta para animar el arranque.
   if (!live.active) {
     return (
-      <StartMatchForm
-        count={teamCount}
-        names={names}
-        onCountChange={setTeamCount}
-        onNameChange={setName}
-        onSwapTeams={swapTeams}
-        onStart={start}
-      />
+      <ViewTransition
+        key="setup"
+        exit={{ "live-start": "live-setup", default: "none" }}
+        default="none"
+      >
+        <StartMatchForm
+          count={teamCount}
+          names={names}
+          onCountChange={changeTeamCount}
+          onNameChange={setName}
+          onSwapTeams={swapTeams}
+          onStart={start}
+        />
+      </ViewTransition>
     );
   }
 
-  const hasRotation = live.queue.length > 0;
+  const manyTeams = live.teams.length > 2;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
-      <LiveScoreboard
-        home={home}
-        away={away}
-        scoreHome={scoreHome}
-        scoreAway={scoreAway}
-        elapsedSec={elapsedSec}
-        scorersHome={scorersHome}
-        scorersAway={scorersAway}
-        queue={live.queue.map(sideOf)}
-      />
+    <ViewTransition
+      key="live"
+      enter={{ "live-start": "live-board", default: "none" }}
+      default="none"
+    >
+      <div className="mx-auto max-w-4xl space-y-5">
+        <LiveScoreboard standings={standings} elapsedSec={elapsedSec} />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {[home, away].map((side) => {
-          const score = side.key === live.home ? scoreHome : scoreAway;
-          return (
-            <Button
-              key={side.key}
-              className="h-24 flex-col gap-1 rounded-xl text-white shadow-sm transition-transform hover:brightness-110 active:scale-[0.99]"
-              style={{ backgroundColor: TEAM_COLORS[side.key] }}
-              onClick={() => addGoal(side.key)}
-              aria-label={`Gol de ${side.name}`}
-            >
-              <PlayIcon className="size-5 rotate-90" />
-              <span className="font-bold">Agregar gol</span>
-              <span className="max-w-full truncate text-xs font-medium opacity-90">
-                {side.name}
-              </span>
-              <span className="text-[11px] opacity-75">
-                {score === 0
-                  ? "Sin goles aún"
-                  : `${score} gol${score === 1 ? "" : "es"}`}
-              </span>
-            </Button>
-          );
-        })}
+        <GoalButtons onAddGoal={addGoal} standings={standings} />
+
+        <GoalTimeline
+          goals={live.goals}
+          sideOf={sideOf}
+          getPlayer={(id) => playersById.get(id)}
+          formatMinute={(at) => formatGoalMinute(at, live.startedAt)}
+          formatClock={formatGoalClock}
+          onAssign={setAttrId}
+          onRemove={removeGoal}
+        />
+
+        <LiveActions
+          onDiscard={discard}
+          onFinalize={finalize}
+          pending={pending}
+          standings={standings}
+        />
+
+        <ScorerPickerDrawer
+          open={attrId != null}
+          attrTeam={attrSide?.name ?? ""}
+          teamColor={TEAM_COLORS[attrGoal?.team ?? live.teams[0].key]}
+          minute={attrGoal ? formatGoalMinute(attrGoal.at, live.startedAt) : ""}
+          filter={filter}
+          players={filteredPlayers}
+          goalCounts={attrGoalCounts}
+          onFilterChange={setFilter}
+          onOpenChange={(open) => {
+            if (!open) setAttrId(null);
+          }}
+          onSelectAnonymous={() => {
+            if (attrId) attributeGoal(attrId, null);
+          }}
+          onSelectPlayer={(playerId) => {
+            if (attrId) attributeGoal(attrId, playerId);
+          }}
+        />
       </div>
-
-      <GoalTimeline
-        goals={live.goals}
-        home={home}
-        away={away}
-        getPlayerName={(id) => getPlayerName(playersById, id)}
-        formatMinute={(at) => formatGoalMinute(at, live.startedAt)}
-        formatClock={formatGoalClock}
-        onAssign={setAttrId}
-        onRemove={removeGoal}
-        onRemoveLast={removeLast}
-      />
-
-      <div className="flex flex-col gap-2 sm:flex-row">
-        {hasRotation && (
-          <AlertDialog>
-            <AlertDialogTrigger
-              render={
-                <Button size="lg" className="flex-1" disabled={pending}>
-                  <RepeatIcon />
-                  Guardar y siguiente
-                </Button>
-              }
-            />
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Cerrar este partido</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {home.name} {scoreHome} - {scoreAway} {away.name}. Se guarda
-                  en el registro y entra {sideOf(live.queue[0]).name}: gana y se
-                  queda, empate y se va el local.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={pending}>
-                  Seguir jugando
-                </AlertDialogCancel>
-                <AlertDialogAction onClick={nextGame} disabled={pending}>
-                  {pending ? "Guardando..." : "Siguiente"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-
-        <AlertDialog>
-          <AlertDialogTrigger
-            render={
-              <Button
-                size="lg"
-                className="flex-1"
-                variant={hasRotation ? "outline" : "default"}
-                disabled={pending}
-              >
-                <FlagIcon />
-                {hasRotation ? "Terminar la reta" : "Finalizar partido"}
-              </Button>
-            }
-          />
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Finalizar y guardar</AlertDialogTitle>
-              <AlertDialogDescription>
-                {home.name} {scoreHome} - {scoreAway} {away.name}. Se guardará
-                en el registro de partidos con duración y goleadores
-                {hasRotation ? " y se cerrará la rotación." : "."}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={pending}>
-                Seguir jugando
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={finalize} disabled={pending}>
-                {pending ? "Guardando..." : "Finalizar"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog>
-          <AlertDialogTrigger
-            render={
-              <Button
-                variant="destructive"
-                className="sm:w-auto"
-                disabled={pending}
-                size={"lg"}
-              >
-                <TrashIcon />
-                Descartar
-              </Button>
-            }
-          />
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Descartar partido en vivo</AlertDialogTitle>
-              <AlertDialogDescription>
-                Se eliminará el marcador actual y no se guardará nada en el
-                registro.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={discard} disabled={pending}>
-                Descartar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-
-      <ScorerPickerDrawer
-        open={attrId != null}
-        attrTeam={attrTeam}
-        filter={filter}
-        players={filteredPlayers}
-        onFilterChange={setFilter}
-        onOpenChange={(open) => {
-          if (!open) setAttrId(null);
-        }}
-        onSelectAnonymous={() => {
-          if (attrId) attributeGoal(attrId, null);
-        }}
-        onSelectPlayer={(playerId) => {
-          if (attrId) attributeGoal(attrId, playerId);
-        }}
-      />
-    </div>
+    </ViewTransition>
   );
-}
+};
