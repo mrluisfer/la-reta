@@ -1,63 +1,31 @@
-name: 🐛 Bug report
-description: Report something that isn't working as expected
-title: "[Bug]: "
-labels: ["bug"]
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
 body:
-  - type: markdown
-    attributes:
-      value: Thanks for taking the time to report a bug! Please fill out the details below.
   - type: textarea
-    id: what-happened
+    id: what
     attributes:
-      label: What happened?
-      description: A clear description of the bug.
-      placeholder: When I ..., the app ...
-    validations:
-      required: true
-  - type: textarea
-    id: steps
-    attributes:
-      label: Steps to reproduce
-      description: How can we reproduce it?
+      label: What happens
+      description: What you did, and what you got instead of what you expected.
       placeholder: |
-        1. Go to '...'
-        2. Click on '...'
-        3. See error
+        1. Open /players
+        2. Tap a card
+        3. The page stays blank
     validations:
       required: true
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected behavior
-      description: What did you expect to happen instead?
-    validations:
-      required: true
-  - type: textarea
-    id: screenshots
-    attributes:
-      label: Screenshots / logs
-      description: If applicable, add screenshots or console/server logs.
-    validations:
-      required: false
   - type: dropdown
     id: area
     attributes:
-      label: Area
-      description: Where does this happen?
+      label: Where
       options:
-        - Dashboard
-        - Players
-        - Team builder
-        - Live scoreboard
-        - Admin
-        - Other / not sure
+        - Web
+        - App
+        - Both
+        - Not sure
     validations:
-      required: false
+      required: true
   - type: input
     id: environment
     attributes:
-      label: Environment
-      description: Browser, OS, and device (for UI bugs).
-      placeholder: e.g. Chrome 120 · macOS 15 · Desktop
-    validations:
-      required: false
+      label: Device, OS and browser
+      placeholder: iPhone 14 Pro - Safari - iOS 18

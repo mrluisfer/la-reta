@@ -1,37 +1,22 @@
-name: ✨ Feature request
-description: Suggest an idea or improvement
-title: "[Feature]: "
-labels: ["enhancement"]
+name: Idea
+description: Suggest something new or an improvement
+labels: [enhancement]
 body:
-  - type: markdown
-    attributes:
-      value: Thanks for the idea! Please describe what you'd like to see.
   - type: textarea
-    id: problem
+    id: idea
     attributes:
-      label: What problem does this solve?
-      description: Is your request related to a problem or a pain point?
-      placeholder: I find it hard to ...
-    validations:
-      required: false
-  - type: textarea
-    id: solution
-    attributes:
-      label: Proposed solution
-      description: What would you like to happen?
+      label: What would you like
+      description: And what is awkward today without it.
     validations:
       required: true
-  - type: textarea
-    id: alternatives
+  - type: dropdown
+    id: area
     attributes:
-      label: Alternatives considered
-      description: Any other approaches you thought about?
+      label: Where
+      options:
+        - Web
+        - App
+        - Both
+        - Not sure
     validations:
-      required: false
-  - type: textarea
-    id: context
-    attributes:
-      label: Additional context
-      description: Mockups, references, or anything else that helps.
-    validations:
-      required: false
+      required: true

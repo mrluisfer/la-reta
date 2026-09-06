@@ -4,7 +4,7 @@
 
 Please **do not** open a public issue for security vulnerabilities.
 
-Instead, report them privately through GitHub's [**Report a vulnerability**](https://github.com/mrluisfer/la-reta/security/advisories/new) flow (Security → Advisories), or by contacting the maintainer directly.
+Instead, report them privately through GitHub's [**Report a vulnerability**](https://github.com/La-Reta/la-reta/security/advisories/new) flow (Security → Advisories), or by contacting the maintainer directly.
 
 When reporting, please include:
 

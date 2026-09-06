@@ -1,8 +1,5 @@
-blank_issues_enabled: false
+blank_issues_enabled: true
 contact_links:
-  - name: 💬 Questions & ideas
-    url: https://github.com/mrluisfer/la-reta/discussions
-    about: Ask questions or discuss ideas before opening an issue.
-  - name: 🔒 Report a security vulnerability
-    url: https://github.com/mrluisfer/la-reta/security/advisories/new
-    about: Please report vulnerabilities privately, not as a public issue.
+  - name: Report a security vulnerability
+    url: https://github.com/La-Reta/la-reta/security/advisories/new
+    about: Report it privately through a security advisory, never as a public issue.

@@ -1,34 +1,14 @@
-<!-- Thanks for contributing! Please fill this out so we can review quickly. -->
+## What changed
 
-# Summary
+<!-- One or two lines. The technical why — what you tried, what failed, why this
+     is the fix — belongs in the commit message, which outlives the PR. -->
 
-<!-- What does this PR do and why? -->
+## How it was verified
 
-## Related issue
+<!-- What you actually ran or clicked. There is no test runner: the web is
+     `npm run build` plus the affected page, the app is the simulator.
+     "Should work" is not a check. -->
 
-<!-- e.g. Closes #123 -->
+## Screenshots
 
-## Type of change
-
-- [ ] 🐛 Bug fix
-- [ ] ✨ New feature
-- [ ] 📝 Documentation
-- [ ] ♻️ Refactor / chore
-- [ ] 💥 Breaking change
-
-## How was this tested?
-
-<!-- No test runner is configured — describe how you exercised the affected flow. -->
-
-## Screenshots / recordings
-
-<!-- For UI changes, before/after helps a lot. -->
-
-## Checklist
-
-- [ ] `npm run lint` passes
-- [ ] `npm run format` was run
-- [ ] `npm run build` compiles successfully
-- [ ] My changes are **additive** to the database schema (no destructive DML / no rewriting user data)
-- [ ] I read [CONTRIBUTING.md](../CONTRIBUTING.md)
-- [ ] The PR is focused and single-purpose
+<!-- Before/after for anything visual. Delete this section otherwise. -->
