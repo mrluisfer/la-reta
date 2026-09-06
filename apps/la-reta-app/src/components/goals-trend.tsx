@@ -57,10 +57,22 @@ export function GoalsTrend({
     );
   }
 
+  const peak = Math.max(
+    ...data.map((point) => point.goals ?? point.latest ?? 0)
+  );
+
   return (
     <View style={{ height: CHART_HEIGHT }}>
       <CartesianChart
         data={data}
+        // **La escala arranca en cero, y no en el mínimo del recorrido.** Una
+        // barra dice su valor por lo que mide, así que el eje no puede empezar
+        // donde le convenga: con el suelo ajustado a los datos, la jornada más
+        // floja —12 goles de 20— se quedaba con altura cero y desaparecía del
+        // todo, y las de 14 y 15 parecían el doble la una de la otra. Es el
+        // recorte de eje de siempre, y en barras no es un ajuste de estilo,
+        // es contar mal.
+        domain={{ y: [0, peak] }}
         // El hueco lateral no es estético: la etiqueta va centrada bajo su
         // barra, y con la primera pegada al eje "25 jun" se salía del lienzo.
         domainPadding={{ left: 34, right: 34, top: 18 }}

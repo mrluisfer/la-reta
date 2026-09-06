@@ -9,9 +9,9 @@ import {
   CardHeader,
   CardTitle,
 } from "../../ui/card";
-import { RankingLevelItem } from "./ranking-level-item";
+import { RankingList } from "./ranking-list";
 
-export function RankingLevel({ players }: { players: Player[] }) {
+export const RankingLevel = ({ players }: { readonly players: Player[] }) => {
   const ranking = players.slice(0, 6);
   return (
     <Card className="h-fit" size="sm">
@@ -27,12 +27,8 @@ export function RankingLevel({ players }: { players: Player[] }) {
         </CardAction>
       </CardHeader>
       <CardContent>
-        <ol>
-          {ranking.map((p, i) => (
-            <RankingLevelItem player={p} key={p.id} index={i} />
-          ))}
-        </ol>
+        <RankingList players={ranking} />
       </CardContent>
     </Card>
   );
-}
+};

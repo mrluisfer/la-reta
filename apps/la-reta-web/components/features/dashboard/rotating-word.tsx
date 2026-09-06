@@ -1,7 +1,10 @@
 "use client";
 
-import * as React from "react";
+import { FADE_DURATION, SPRING_POP } from "@/components/motion/motion-tokens";
+import { usePageVisible } from "@/components/motion/use-page-visible";
 import { cn } from "@/lib/utils";
+import { AnimatePresence, m } from "motion/react";
+import * as React from "react";
 
 function nextRandom(current: number, len: number) {
   if (len <= 1) return current;
@@ -11,51 +14,59 @@ function nextRandom(current: number, len: number) {
 }
 
 /**
- * Cycles through `words` at random, fading between them. Starts on words[0] so
- * the server and first client render match. Honors prefers-reduced-motion.
+ * Cycles through `words` at random. Starts on words[0] so the server and first
+ * client render match.
+ *
+ * El relevo lo hace `AnimatePresence`: la palabra vieja sale hacia abajo
+ * difuminándose mientras la nueva cae desde arriba, en la misma línea. Antes se
+ * emulaba con un `setTimeout` a mitad del intervalo, que dejaba un hueco en
+ * blanco y se rompía si el usuario cambiaba de pestaña. `prefers-reduced-motion`
+ * lo cubre el `<MotionConfig>` de `components/motion/motion-provider.tsx`.
  */
-export function RotatingWord({
+export const RotatingWord = ({
   words,
   className,
   intervalMs = 2600,
 }: {
-  words: string[];
-  className?: string;
-  intervalMs?: number;
-}) {
+  readonly words: string[];
+  readonly className?: string;
+  readonly intervalMs?: number;
+}) => {
   const [index, setIndex] = React.useState(0);
-  const [visible, setVisible] = React.useState(true);
+  const visible = usePageVisible();
 
   React.useEffect(() => {
-    const reduce =
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    let swap: ReturnType<typeof setTimeout>;
-    const tick = setInterval(() => {
-      if (reduce) {
-        setIndex((i) => nextRandom(i, words.length));
-        return;
-      }
-      setVisible(false);
-      swap = setTimeout(() => {
-        setIndex((i) => nextRandom(i, words.length));
-        setVisible(true);
-      }, 240);
-    }, intervalMs);
-    return () => {
-      clearInterval(tick);
-      clearTimeout(swap);
-    };
-  }, [words.length, intervalMs]);
+    if (!visible) return;
+    const tick = setInterval(
+      () => setIndex((i) => nextRandom(i, words.length)),
+      intervalMs
+    );
+    return () => clearInterval(tick);
+  }, [words.length, intervalMs, visible]);
+
+  const word = words[index];
 
   return (
-    <span
-      className={cn(
-        "inline-block transition-all duration-300",
-        visible ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0",
-        className,
-      )}
-    >
-      {words[index]}
+    // `grid` con una sola celda: entrante y saliente se apilan en el mismo
+    // espacio, así que el titular no da un salto de altura al relevarse.
+    <span className={cn("inline-grid text-left", className)}>
+      <AnimatePresence initial={false} mode="popLayout">
+        <m.span
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          className="col-start-1 row-start-1"
+          exit={{
+            opacity: 0,
+            y: "0.3em",
+            filter: "blur(4px)",
+            transition: { duration: FADE_DURATION },
+          }}
+          initial={{ opacity: 0, y: "-0.3em", filter: "blur(4px)" }}
+          key={word}
+          transition={{ ...SPRING_POP, filter: { duration: FADE_DURATION } }}
+        >
+          {word}
+        </m.span>
+      </AnimatePresence>
     </span>
   );
-}
+};

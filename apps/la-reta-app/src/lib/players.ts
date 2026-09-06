@@ -12,6 +12,7 @@ import {
   type MatchTeam,
   type Player,
   type StatKey,
+  type StatSnapshot,
 } from "@/lib/types";
 
 /**
@@ -220,4 +221,254 @@ export function overallRank(
   if (index === -1) return null;
 
   return { rank: index + 1, total: sorted.length };
+}
+
+/** Cómo acabó un partido para el equipo del jugador. */
+export type Result = "win" | "draw" | "loss";
+
+export interface PlayerRecord {
+  /** Partidos en los que consta, marcara o no: el acta lo apunta igual. */
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  /** Goles de su equipo y de los rivales, sumando los partidos que jugó. */
+  scored: number;
+  conceded: number;
+  /** Los últimos resultados, del más reciente al más viejo. */
+  form: Result[];
+}
+
+/**
+ * El palmarés del jugador, reconstruido del historial de partidos.
+ *
+ * Se puede porque el acta guarda una fila por participante aunque no marque
+ * —gol cero también es asistencia—, así que `scorers` es la convocatoria y no
+ * solo la lista de goleadores. Y porque cada fila dice en qué equipo estuvo,
+ * que es lo que permite saber si ganó: en una reta de tres, el 8–1 del acta
+ * puede ser de los otros dos.
+ *
+ * Sin letra de equipo no se puede decidir nada, así que ese partido cuenta como
+ * jugado y no entra en el balance. Es lo honesto: los partidos viejos se
+ * apuntaron sin equipo y darles un resultado sería inventarlo.
+ */
+export function playerRecord(
+  matches: Match[] | null,
+  playerId: number
+): PlayerRecord {
+  const record: PlayerRecord = {
+    played: 0,
+    won: 0,
+    drawn: 0,
+    lost: 0,
+    scored: 0,
+    conceded: 0,
+    form: [],
+  };
+
+  for (const match of matches ?? []) {
+    const own = match.scorers.find((scorer) => scorer.playerId === playerId);
+    if (own === undefined) continue;
+
+    record.played += 1;
+    if (own.team === null) continue;
+
+    const teams = matchTeams(match);
+    const mine = teams.find((team) => team.key === own.team);
+    if (mine === undefined) continue;
+
+    const best = Math.max(...teams.map((team) => team.score));
+    // El rival es el mejor de los otros: en una reta de tres, quedar segundo es
+    // haber perdido contra alguien, aunque le hayas ganado al tercero.
+    const rival = Math.max(
+      ...teams.filter((team) => team.key !== mine.key).map((team) => team.score)
+    );
+
+    record.scored += mine.score;
+    record.conceded += rival;
+
+    const result: Result =
+      mine.score === best && mine.score > rival
+        ? "win"
+        : mine.score === rival
+          ? "draw"
+          : "loss";
+
+    if (result === "win") record.won += 1;
+    if (result === "draw") record.drawn += 1;
+    if (result === "loss") record.lost += 1;
+    record.form.push(result);
+  }
+
+  return record;
+}
+
+/**
+ * Cómo acabó una aparición concreta, mirando solo esa fila.
+ *
+ * Va por entrada y no por índice contra `PlayerRecord.form` a propósito: la
+ * tira de forma se salta los partidos sin letra de equipo, así que sus
+ * posiciones dejan de coincidir con las de la lista en cuanto hay un acta
+ * vieja. Con la entrada delante no hay nada que alinear.
+ */
+export function entryResult(entry: GoalEntry): Result | null {
+  if (entry.team === null) return null;
+
+  const mine = entry.teams.find((team) => team.key === entry.team);
+  if (mine === undefined) return null;
+
+  const rival = Math.max(
+    ...entry.teams
+      .filter((team) => team.key !== mine.key)
+      .map((team) => team.score)
+  );
+
+  if (mine.score > rival) return "win";
+  return mine.score === rival ? "draw" : "loss";
+}
+
+export interface Teammate {
+  playerId: number;
+  name: string;
+  displayName: string;
+  /** Partidos compartidos en el mismo equipo. */
+  together: number;
+  won: number;
+}
+
+/**
+ * Con quién juega.
+ *
+ * Es de las pocas cosas que la reta discute y ningún número recogía: quién cae
+ * siempre en el mismo equipo que tú y si esa pareja gana. Sale de cruzar el
+ * acta consigo misma —mismo partido, misma letra de equipo—, así que no cuesta
+ * ninguna petición nueva.
+ */
+export function playerTeammates(
+  matches: Match[] | null,
+  playerId: number,
+  limit = 3
+): Teammate[] {
+  const found = new Map<number, Teammate>();
+
+  for (const match of matches ?? []) {
+    const own = match.scorers.find((scorer) => scorer.playerId === playerId);
+    if (own === undefined || own.team === null) continue;
+
+    const teams = matchTeams(match);
+    const mine = teams.find((team) => team.key === own.team);
+    const best =
+      mine === undefined ? 0 : Math.max(...teams.map((t) => t.score));
+    const won = mine !== undefined && mine.score === best;
+
+    for (const mate of match.scorers) {
+      if (
+        mate.playerId === null ||
+        mate.playerId === playerId ||
+        mate.team !== own.team
+      ) {
+        continue;
+      }
+
+      const entry = found.get(mate.playerId) ?? {
+        playerId: mate.playerId,
+        name: mate.name,
+        displayName: mate.displayName,
+        together: 0,
+        won: 0,
+      };
+      entry.together += 1;
+      if (won) entry.won += 1;
+      found.set(mate.playerId, entry);
+    }
+  }
+
+  return [...found.values()]
+    .sort((a, b) => b.together - a.together || b.won - a.won)
+    .slice(0, limit);
+}
+
+/**
+ * Qué cambió en el último ajuste: la instantánea de hoy contra la anterior.
+ *
+ * **Contra la anterior y no contra la del alta**, aunque esa también esté
+ * guardada. La primera instantánea es la que se escribe al dar de alta al
+ * jugador, con los valores por defecto que puso quien lo registró; medir contra
+ * ella no cuenta una carrera, cuenta cuánto se equivocó la estimación inicial,
+ * y sale en rojo grande junto a un jugador que no ha empeorado en nada.
+ *
+ * Con una sola instantánea no hay cambio que contar y devuelve `null`.
+ */
+export function statDeltas(
+  history: StatSnapshot[] | undefined
+): Record<StatKey, number> | null {
+  if (!history || history.length < 2) return null;
+
+  const previous = history.at(-2);
+  const last = history.at(-1);
+  if (previous === undefined || last === undefined) return null;
+
+  const deltas = {} as Record<StatKey, number>;
+  for (const key of STAT_KEYS) {
+    deltas[key] = last[key] - previous[key];
+  }
+  return deltas;
+}
+
+export interface StatChange {
+  key: StatKey;
+  from: number;
+  to: number;
+  delta: number;
+}
+
+export interface HistoryEvent {
+  recordedAt: string;
+  overallFrom: number;
+  overallTo: number;
+  /** Solo los atributos que se movieron. */
+  changes: StatChange[];
+}
+
+/**
+ * El diario de ajustes: qué cambió en cada revisión y cuándo.
+ *
+ * La gráfica dibuja la forma —si viene subiendo— y esto dice qué pasó en cada
+ * escalón, que es la pregunta siguiente y la que no se puede leer de una línea:
+ * un salto de dos puntos puede ser "le subieron el tiro" o "le subieron cuatro
+ * cosas y le bajaron dos". La web ya lo enseña así en la ficha de admin; esto
+ * es lo mismo para quien no administra nada.
+ *
+ * Del más reciente al más viejo, como cualquier registro de actividad. Las
+ * revisiones que no tocaron nada no salen: existen en la tabla —guardar sin
+ * cambiar nada también escribe fila— y en una lista serían ruido.
+ */
+export function statChangeLog(
+  history: StatSnapshot[] | null | undefined
+): HistoryEvent[] {
+  const events: HistoryEvent[] = [];
+
+  for (const [index, current] of (history ?? []).entries()) {
+    if (index === 0) continue;
+    const previous = (history ?? [])[index - 1];
+
+    const changes: StatChange[] = [];
+    for (const key of STAT_KEYS) {
+      const delta = current[key] - previous[key];
+      if (delta !== 0) {
+        changes.push({ key, from: previous[key], to: current[key], delta });
+      }
+    }
+
+    if (changes.length === 0) continue;
+
+    events.push({
+      recordedAt: current.recordedAt,
+      overallFrom: previous.overall,
+      overallTo: current.overall,
+      changes,
+    });
+  }
+
+  return events.reverse();
 }

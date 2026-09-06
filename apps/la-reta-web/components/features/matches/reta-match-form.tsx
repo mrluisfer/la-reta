@@ -26,6 +26,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { PlayerPicker } from "@/components/features/matches/player-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/native-select";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
+import { SPRING_SETTLE } from "@/components/motion/motion-tokens";
 import { formatApiDate } from "@/lib/dates";
 import {
   DEFAULT_TEAM_COUNT,
@@ -52,6 +54,7 @@ import {
   SaveIcon,
   XIcon,
 } from "lucide-react";
+import { AnimatePresence, m } from "motion/react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -130,7 +133,7 @@ function teamsFromReta(reta: RetaToMatchItem): Team[] {
       .map((p) =>
         p.playerId != null
           ? rosterRow(p.playerId, p.name)
-          : guestRow(p.guestName ?? p.name),
+          : guestRow(p.guestName ?? p.name)
       ),
   }));
 }
@@ -166,19 +169,28 @@ export function RetaMatchForm({
   players,
   match,
   admin,
+  onCancel,
 }: {
   retas?: RetaToMatchItem[];
   players: MatchPlayer[];
   /** Presente = modo edición de un partido ya guardado. */
   match?: EditRetaMatch;
   admin: boolean;
+  /**
+   * Qué pasa al cancelar. El formulario no sabe dónde vive —hoy es un panel
+   * plegable en /matches y una página completa en /matches/[id]/edit—, así que
+   * quien lo monta decide si además hay que cerrar algo o navegar. Sin este
+   * prop se queda con lo razonable por defecto: volver al partido en edición,
+   * vaciarse en alta.
+   */
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const isEdit = Boolean(match);
   const [retaId, setRetaId] = React.useState("");
   const [playedAt, setPlayedAt] = React.useState(match?.playedAt ?? "");
   const [teams, setTeams] = React.useState<Team[]>(() =>
-    match ? teamsFromMatch(match) : blankTeams(DEFAULT_TEAM_COUNT),
+    match ? teamsFromMatch(match) : blankTeams(DEFAULT_TEAM_COUNT)
   );
   const [open, setOpen] = React.useState(isEdit);
   // Partidos viejos pueden traer goleadores sin equipo: se muestran aparte para
@@ -188,12 +200,12 @@ export function RetaMatchForm({
       ? match.scorers
           .filter((s) => !match.teams.some((t) => t.key === s.team))
           .map(rowFromScorer)
-      : [],
+      : []
   );
   const [durationMin, setDurationMin] = React.useState(
     match?.durationSec != null
       ? String(Math.round(match.durationSec / 60))
-      : "60",
+      : "60"
   );
   const [balance, setBalance] = React.useState(match?.balance ?? 50);
   const [notes, setNotes] = React.useState(match?.notes ?? "");
@@ -201,7 +213,7 @@ export function RetaMatchForm({
 
   const playersById = React.useMemo(
     () => new Map(players.map((p) => [p.id, p.name])),
-    [players],
+    [players]
   );
   function pickReta(value: string) {
     setRetaId(value);
@@ -212,7 +224,7 @@ export function RetaMatchForm({
 
   function patchTeam(index: number, patch: Partial<Team>) {
     setTeams((prev) =>
-      prev.map((t, i) => (i === index ? { ...t, ...patch } : t)),
+      prev.map((t, i) => (i === index ? { ...t, ...patch } : t))
     );
   }
 
@@ -238,8 +250,8 @@ export function RetaMatchForm({
             name: defaultTeamName(key),
             score: "0",
             players: [],
-          },
-      ),
+          }
+      )
     );
   }
 
@@ -248,8 +260,8 @@ export function RetaMatchForm({
       prev.map((t, i) =>
         i === index && !t.players.some((p) => p.key === row.key)
           ? { ...t, players: [...t.players, row] }
-          : t,
-      ),
+          : t
+      )
     );
   }
 
@@ -263,11 +275,11 @@ export function RetaMatchForm({
               score: String(
                 t.players
                   .filter((p) => p.key !== key)
-                  .reduce((n, p) => n + num(p.goals), 0),
+                  .reduce((n, p) => n + num(p.goals), 0)
               ),
             }
-          : t,
-      ),
+          : t
+      )
     );
   }
 
@@ -283,27 +295,39 @@ export function RetaMatchForm({
               ...t,
               players: [...t.players, row],
               score: String(
-                [...t.players, row].reduce((n, p) => n + num(p.goals), 0),
+                [...t.players, row].reduce((n, p) => n + num(p.goals), 0)
               ),
             }
-          : t,
-      ),
+          : t
+      )
     );
   }
 
-  /** Deja el formulario en blanco (alta) o lo devuelve al partido (edición). */
-  function cancel() {
-    if (match) {
-      router.push(`/matches/${match.id}/detail`);
-      return;
-    }
+  /**
+   * Deja el formulario como recién abierto. Lo comparten cancelar y guardar:
+   * cuando estaba duplicado, la copia de `submit` se olvidaba de `loose` y los
+   * goleadores sin equipo se colaban en el registro siguiente.
+   */
+  function resetForm() {
     setRetaId("");
     setTeams(blankTeams(DEFAULT_TEAM_COUNT));
     setLoose([]);
     setPlayedAt("");
-    setDurationMin("");
+    setDurationMin("60");
     setBalance(50);
     setNotes("");
+  }
+
+  function cancel() {
+    if (onCancel) {
+      onCancel();
+      return;
+    }
+    if (match) {
+      router.push(`/matches/${match.id}/detail`);
+      return;
+    }
+    resetForm();
   }
 
   /** Escribe goles/asistencias y refleja el marcador del equipo. */
@@ -312,7 +336,7 @@ export function RetaMatchForm({
       prev.map((team, i) => {
         if (i !== index) return team;
         const rows = team.players.map((p) =>
-          p.key === key ? { ...p, ...patch } : p,
+          p.key === key ? { ...p, ...patch } : p
         );
         return {
           ...team,
@@ -322,7 +346,7 @@ export function RetaMatchForm({
               ? String(rows.reduce((n, p) => n + num(p.goals), 0))
               : team.score,
         };
-      }),
+      })
     );
   }
 
@@ -358,7 +382,7 @@ export function RetaMatchForm({
             team: team.key as string,
             goals: num(p.goals),
             assists: num(p.assists),
-          })),
+          }))
         ),
         ...loose.map((p) => ({
           playerId: p.playerId,
@@ -385,12 +409,7 @@ export function RetaMatchForm({
         return;
       }
       toast.success("Reta registrada en el historial");
-      setRetaId("");
-      setTeams(blankTeams(DEFAULT_TEAM_COUNT));
-      setPlayedAt("");
-      setDurationMin("");
-      setBalance(50);
-      setNotes("");
+      resetForm();
       router.refresh();
     });
   }
@@ -408,7 +427,7 @@ export function RetaMatchForm({
         render={<CardHeader />}
         className={cn(
           !isEdit &&
-            "hover:bg-muted cursor-pointer border-b pt-6 transition-colors select-none",
+            "hover:bg-muted cursor-pointer border-b pt-6 transition-colors select-none"
         )}
       >
         <CardTitle className="flex items-center gap-2 text-base">
@@ -470,7 +489,7 @@ export function RetaMatchForm({
                   <NativeSelectOption key={n} value={String(n)}>
                     {n}
                   </NativeSelectOption>
-                ),
+                )
               )}
             </NativeSelect>
           </div>
@@ -484,20 +503,39 @@ export function RetaMatchForm({
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          {teams.map((team, i) => (
-            <TeamCard
-              key={team.key}
-              team={team}
-              players={players}
-              playersById={playersById}
-              onPatch={(patch) => patchTeam(i, patch)}
-              onAdd={(row) => addRow(i, row)}
-              onRemove={(key) => removeRow(i, key)}
-              onStat={(key, patch) => setStat(i, key, patch)}
-            />
-          ))}
-        </div>
+        {/* Pasar de 2 a 4 equipos reparte la rejilla de golpe y cuesta seguir
+            qué se movió a dónde. `layout` interpola la posición real de cada
+            tarjeta y `AnimatePresence` da entrada y salida a las que aparecen o
+            se van: es justo lo que el CSS no puede hacer, porque nadie conoce
+            las coordenadas de antes y después más que el navegador. */}
+        {/* `layout` también en la rejilla: `popLayout` saca del flujo a la
+            tarjeta que se va, así que sin esto la altura del contenedor cambia
+            de golpe y lo que hay debajo salta encima de la que todavía se está
+            despidiendo. */}
+        <m.div className="grid gap-4 lg:grid-cols-2" layout>
+          <AnimatePresence initial={false} mode="popLayout">
+            {teams.map((team, i) => (
+              <m.div
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.92 }}
+                initial={{ opacity: 0, scale: 0.92 }}
+                key={team.key}
+                layout
+                transition={SPRING_SETTLE}
+              >
+                <TeamCard
+                  onAdd={(row) => addRow(i, row)}
+                  onPatch={(patch) => patchTeam(i, patch)}
+                  onRemove={(key) => removeRow(i, key)}
+                  onStat={(key, patch) => setStat(i, key, patch)}
+                  players={players}
+                  playersById={playersById}
+                  team={team}
+                />
+              </m.div>
+            ))}
+          </AnimatePresence>
+        </m.div>
 
         {loose.length > 0 && (
           <LooseCard
@@ -509,48 +547,58 @@ export function RetaMatchForm({
             }
             onStat={(key, patch) =>
               setLoose((prev) =>
-                prev.map((r) => (r.key === key ? { ...r, ...patch } : r)),
+                prev.map((r) => (r.key === key ? { ...r, ...patch } : r))
               )
             }
           />
         )}
 
-        {/* Detalles opcionales del partido. */}
-        <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
-          <div>
-            <Label className="mb-1.5 block text-xs">Duración (min)</Label>
-            <Input
-              type="number"
-              min={0}
-              value={durationMin}
-              onChange={(e) => setDurationMin(e.target.value)}
-              placeholder="60"
-            />
+        {/* Detalles opcionales, juntos y con menos peso: sueltos entre los
+            equipos competían por la atención con el marcador, que es lo único
+            que hay que capturar sí o sí. */}
+        <fieldset className="bg-muted/30 space-y-4 rounded-xl border border-dashed p-3">
+          <legend className="text-muted-foreground px-1 text-xs font-semibold tracking-wide uppercase">
+            Detalles (opcional)
+          </legend>
+          <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
+            <div>
+              <Label className="mb-1.5 block text-xs">Duración (min)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={durationMin}
+                onChange={(e) => setDurationMin(e.target.value)}
+                placeholder="60"
+              />
+            </div>
+            <div>
+              <Label className="mb-1.5 block text-xs">Notas</Label>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Cómo estuvo la reta…"
+                rows={2}
+              />
+            </div>
           </div>
-          <div>
-            <Label className="mb-1.5 block text-xs">Notas</Label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Cómo estuvo la reta…"
-              rows={2}
-            />
-          </div>
-        </div>
 
-        <div>
-          <Label className="mb-1.5 block text-xs">
-            Qué tan pareja estuvo · {balance}
-          </Label>
-          <Slider
-            min={0}
-            max={100}
-            value={balance}
-            onValueChange={(v) =>
-              setBalance(Array.isArray(v) ? v[0] : (v as number))
-            }
-          />
-        </div>
+          <div>
+            <Label className="mb-1.5 block text-xs">
+              Qué tan pareja estuvo ·{" "}
+              <span className="text-foreground font-mono font-bold tabular-nums">
+                {balance}
+              </span>
+            </Label>
+            <Slider
+              min={0}
+              max={100}
+              value={balance}
+              onValueChange={(v) =>
+                setBalance(Array.isArray(v) ? v[0] : (v as number))
+              }
+            />
+          </div>
+        </fieldset>
 
         {admin ? (
           <div className="flex flex-col gap-2 sm:flex-row-reverse xl:justify-between">
@@ -630,7 +678,7 @@ function TeamCard({
   // día y aparecer en más de un equipo. Aquí solo se evita repetirlo dentro del
   // mismo equipo — sus goles se guardan por separado en cada uno.
   const available = players.filter(
-    (p) => !team.players.some((row) => row.playerId === p.id),
+    (p) => !team.players.some((row) => row.playerId === p.id)
   );
 
   function addGuest() {
@@ -641,8 +689,18 @@ function TeamCard({
   }
 
   return (
-    <div className="space-y-3 rounded-xl border p-3">
-      <div className="flex items-center gap-2">
+    // El color del equipo deja de ser un puntito de 10 px y pasa a teñir la
+    // tarjeta entera: filo de acento arriba y un velo del mismo tono en la
+    // cabecera. Con cuatro equipos en pantalla, eso es lo que permite saber en
+    // cuál estás escribiendo sin leer el nombre.
+    // El color del equipo no se pinta siempre: la tarjeta se enciende con él
+    // mientras se escribe dentro (`.team-panel`, en globals.css). Así el color
+    // dice dónde estás en vez de ser decoración permanente.
+    <div
+      className="team-panel h-full rounded-xl border pt-3"
+      style={{ "--team": color } as React.CSSProperties}
+    >
+      <div className="flex items-center gap-2 px-3">
         <span
           aria-hidden="true"
           className="size-2.5 shrink-0 rounded-full"
@@ -654,122 +712,113 @@ function TeamCard({
           placeholder={defaultTeamName(team.key)}
           maxLength={24}
           aria-label={`Nombre del ${defaultTeamName(team.key)}`}
-          className="h-9 min-w-0 flex-1 font-semibold"
+          className="focus-visible:border-input h-9 min-w-0 flex-1 border-transparent bg-transparent px-1 text-base font-bold shadow-none"
         />
+        {/* El marcador es el dato que se viene a capturar: mono y grande para
+            que gane a los demás campos, pero sin color fijo. */}
         <Input
           type="number"
           min={0}
           value={team.score}
           onChange={(e) => onPatch({ score: e.target.value })}
-          className="h-9 w-16 text-center text-lg font-bold"
+          className="h-11 w-16 text-center font-mono text-xl font-black tabular-nums"
           aria-label={`Goles de ${team.name}`}
         />
       </div>
-
-      {team.players.length > 0 ? (
-        <>
-          <div className="text-muted-foreground grid grid-cols-[1fr_3rem_3rem_2rem] gap-2 text-[10px] font-semibold tracking-wide uppercase">
-            <span />
-            <span className="text-center">Goles</span>
-            <span className="text-center">Asist.</span>
-            <span />
-          </div>
-          {team.players.map((p) => (
-            <div
-              key={p.key}
-              className="grid grid-cols-[1fr_3rem_3rem_2rem] items-center gap-2"
-            >
-              <span className="min-w-0 truncate text-sm">
-                {p.playerId != null
-                  ? (playersById.get(p.playerId) ?? p.name)
-                  : p.name}
-                {p.playerId == null && (
-                  <span className="text-muted-foreground text-[10px]">
-                    {" "}
-                    · invitado
-                  </span>
-                )}
-              </span>
-              <Input
-                type="number"
-                min={0}
-                value={p.goals}
-                onChange={(e) => onStat(p.key, { goals: e.target.value })}
-                className="h-8 px-1 text-center"
-                aria-label={`Goles de ${p.name}`}
-              />
-              <Input
-                type="number"
-                min={0}
-                value={p.assists}
-                onChange={(e) => onStat(p.key, { assists: e.target.value })}
-                className="h-8 px-1 text-center"
-                aria-label={`Asistencias de ${p.name}`}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Quitar a ${p.name}`}
-                onClick={() => onRemove(p.key)}
-              >
-                <XIcon />
-              </Button>
+      <div className="space-y-3 px-3 pt-3 pb-3">
+        {team.players.length > 0 ? (
+          <>
+            <div className="text-muted-foreground grid grid-cols-[1fr_3rem_3rem_2rem] gap-2 text-[10px] font-semibold tracking-wide uppercase">
+              <span />
+              <span className="text-center">Goles</span>
+              <span className="text-center">Asist.</span>
+              <span />
             </div>
-          ))}
-        </>
-      ) : (
-        <p className="text-muted-foreground text-xs">
-          Sin jugadores todavía. Agrégalos abajo.
-        </p>
-      )}
+            {team.players.map((p) => (
+              <div
+                key={p.key}
+                className="grid grid-cols-[1fr_3rem_3rem_2rem] items-center gap-2"
+              >
+                <span className="min-w-0 truncate text-sm">
+                  {p.playerId != null
+                    ? (playersById.get(p.playerId) ?? p.name)
+                    : p.name}
+                  {p.playerId == null && (
+                    <span className="text-muted-foreground text-[10px]">
+                      {" "}
+                      · invitado
+                    </span>
+                  )}
+                </span>
+                <Input
+                  type="number"
+                  min={0}
+                  value={p.goals}
+                  onChange={(e) => onStat(p.key, { goals: e.target.value })}
+                  className="h-8 px-1 text-center"
+                  aria-label={`Goles de ${p.name}`}
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  value={p.assists}
+                  onChange={(e) => onStat(p.key, { assists: e.target.value })}
+                  className="h-8 px-1 text-center"
+                  aria-label={`Asistencias de ${p.name}`}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Quitar a ${p.name}`}
+                  onClick={() => onRemove(p.key)}
+                >
+                  <XIcon />
+                </Button>
+              </div>
+            ))}
+          </>
+        ) : (
+          <p className="text-muted-foreground text-xs">
+            Sin jugadores todavía. Agrégalos abajo.
+          </p>
+        )}
 
-      {/* Altas: roster (los que ya están en otro equipo no aparecen) e invitados. */}
-      <div className="space-y-2 border-t pt-3">
-        <NativeSelect
-          className="w-full"
-          value=""
-          disabled={available.length === 0}
-          onChange={(e) => {
-            const id = Number(e.target.value);
-            if (id) onAdd(rosterRow(id, playersById.get(id) ?? "Jugador"));
-          }}
-        >
-          <NativeSelectOption value="">
-            {available.length === 0
-              ? "Ya agregaste a todos"
-              : "+ Agregar jugador…"}
-          </NativeSelectOption>
-          {available.map((p) => (
-            <NativeSelectOption key={p.id} value={String(p.id)}>
-              {p.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-        <div className="flex gap-2">
-          <Input
-            value={guestName}
-            onChange={(e) => setGuestName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addGuest();
-              }
-            }}
-            placeholder="Invitado de última hora"
-            maxLength={60}
-            className="h-9"
+        {/* Altas: roster (los que ya están en otro equipo no aparecen) e invitados. */}
+        <div className="space-y-2 border-t pt-3">
+          <PlayerPicker
+            onPick={(picked) =>
+              onAdd(
+                rosterRow(picked.id, playersById.get(picked.id) ?? picked.name)
+              )
+            }
+            players={available}
           />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Agregar invitado"
-            disabled={!guestName.trim()}
-            onClick={addGuest}
-          >
-            <PlusIcon />
-          </Button>
+          <div className="flex gap-2">
+            <Input
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addGuest();
+                }
+              }}
+              placeholder="Invitado de última hora"
+              maxLength={60}
+              className="h-9"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Agregar invitado"
+              disabled={!guestName.trim()}
+              onClick={addGuest}
+            >
+              <PlusIcon />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

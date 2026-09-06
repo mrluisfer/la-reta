@@ -143,12 +143,20 @@ function AlertDialogDescription({
 
 function AlertDialogAction({
   className,
+  variant = "default",
+  size = "default",
   ...props
-}: React.ComponentProps<typeof Button>) {
+}: AlertDialogPrimitive.Close.Props &
+  Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
   return (
-    <Button
+    // MODIFICADO respecto a shadcn: `Close`, no un `Button` suelto. Tal como lo
+    // genera shadcn, confirmar ejecutaba la acción y dejaba el diálogo abierto
+    // encima; había que cerrarlo a mano, y ese clic de más caía en lo que
+    // hubiera debajo. Conservar al regenerar.
+    <AlertDialogPrimitive.Close
       data-slot="alert-dialog-action"
       className={cn(className)}
+      render={<Button variant={variant} size={size} />}
       {...props}
     />
   )

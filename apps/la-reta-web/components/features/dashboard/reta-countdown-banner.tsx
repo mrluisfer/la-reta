@@ -1,6 +1,9 @@
 "use client";
 
+import { SPRING_SETTLE } from "@/components/motion/motion-tokens";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { AnimatePresence, m } from "motion/react";
 import { computeReta } from "@/lib/functions/compute-reta";
 import { CDMX_TZ, DAY_MS, SHOW_WITHIN_DAYS } from "@/lib/match-dates";
 import {
@@ -32,7 +35,7 @@ const timeFmt = new Intl.DateTimeFormat("es-MX", {
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function RetaCountdownBanner() {
+export const RetaCountdownBanner = () => {
   const [mounted, setMounted] = React.useState(false);
 
   const [, setTick] = React.useState(0);
@@ -60,17 +63,23 @@ export function RetaCountdownBanner() {
   if (daysUntil > SHOW_WITHIN_DAYS) return null;
 
   return <Banner kickoff={kickoff} isToday={daysUntil === 0} />;
-}
+};
 
-function Banner({ kickoff, isToday }: { kickoff: Date; isToday: boolean }) {
+const Banner = ({
+  kickoff,
+  isToday,
+}: {
+  readonly kickoff: Date;
+  readonly isToday: boolean;
+}) => {
   // El ticker de 1s solo vive mientras el banner está montado (≤2 días al mes).
   const [remaining, setRemaining] = React.useState(
-    () => kickoff.getTime() - Date.now(),
+    () => kickoff.getTime() - Date.now()
   );
   React.useEffect(() => {
     const id = setInterval(
       () => setRemaining(kickoff.getTime() - Date.now()),
-      1000,
+      1000
     );
     return () => clearInterval(id);
   }, [kickoff]);
@@ -173,7 +182,7 @@ function Banner({ kickoff, isToday }: { kickoff: Date; isToday: boolean }) {
                     className="w-16 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-2.5 text-center backdrop-blur-sm"
                   >
                     <div className="bg-gradient-to-b from-white to-emerald-200/80 bg-clip-text font-mono text-2xl leading-none font-black text-transparent tabular-nums sm:text-3xl">
-                      {u.value}
+                      <Odometer value={u.value} />
                     </div>
                     <div className="font-display mt-1 text-[9px] font-semibold tracking-[0.18em] text-white/45 uppercase">
                       {u.label}
@@ -187,4 +196,32 @@ function Banner({ kickoff, isToday }: { kickoff: Date; isToday: boolean }) {
       </div>
     </section>
   );
-}
+};
+
+/**
+ * Un dígito que rueda: el valor viejo sale por arriba mientras el nuevo sube
+ * desde abajo, como el marcador mecánico de un estadio. La rejilla de una sola
+ * celda mantiene ambos en el mismo sitio y `overflow-hidden` recorta el viaje.
+ */
+const Odometer = ({
+  value,
+  className,
+}: {
+  readonly value: string;
+  readonly className?: string;
+}) => (
+  <span className={cn("inline-grid overflow-hidden", className)}>
+    <AnimatePresence initial={false} mode="popLayout">
+      <m.span
+        animate={{ y: "0%", opacity: 1 }}
+        className="col-start-1 row-start-1"
+        exit={{ y: "-100%", opacity: 0 }}
+        initial={{ y: "100%", opacity: 0 }}
+        key={value}
+        transition={SPRING_SETTLE}
+      >
+        {value}
+      </m.span>
+    </AnimatePresence>
+  </span>
+);

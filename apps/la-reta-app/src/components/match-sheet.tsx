@@ -1,7 +1,14 @@
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView } from "react-native";
 
+import {
+  ContributionChart,
+  LineHeatmap,
+  TeamRadar,
+} from "@/components/match-analysis";
 import { MatchHero } from "@/components/match-hero";
+import { MatchDials } from "@/components/match-share";
+import { MatchStrip } from "@/components/match-strip";
 import { Notice } from "@/components/notice";
 import { ScorerBoard } from "@/components/scorer-board";
 import { Section } from "@/components/ui/section";
@@ -10,6 +17,8 @@ import { VoteResults } from "@/components/vote-results";
 import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
 import { useMatchVotes } from "@/hooks/use-match-votes";
 import { useReta } from "@/hooks/use-reta";
+import { teamProfiles } from "@/lib/match-analysis";
+import { matchGoals, rankedTeams } from "@/lib/teams";
 
 /**
  * Ficha de un partido.
@@ -23,10 +32,19 @@ import { useReta } from "@/hooks/use-reta";
  */
 export function MatchSheet() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { matches, players, loading, error, refetch } = useReta();
   const { tally } = useMatchVotes(id);
 
   const match = matches?.find((item) => String(item.id) === id) ?? null;
+
+  // La ficha de jugador vive en el mismo grupo compartido que esta, así que se
+  // abre dentro de la pestaña de la que vienes en vez de saltar a Plantilla.
+  const openPlayer = (playerId: number) =>
+    router.push({
+      pathname: "/jugador/[id]",
+      params: { id: String(playerId) },
+    });
 
   if (match === null) {
     return (
@@ -51,6 +69,8 @@ export function MatchSheet() {
     );
   }
 
+  const profiles = teamProfiles(match, players);
+
   return (
     <ScrollView
       contentContainerStyle={{
@@ -70,13 +90,26 @@ export function MatchSheet() {
 
       <MatchHero match={match} />
 
-      <Section title="Goleadores">
-        <ScorerBoard match={match} players={players} />
+      <MatchStrip match={match} />
+
+      <Section
+        meta={`${matchGoals(match)} ${matchGoals(match) === 1 ? "gol" : "goles"}`}
+        title="Goleadores"
+      >
+        <ScorerBoard
+          match={match}
+          onOpenPlayer={openPlayer}
+          players={players}
+        />
       </Section>
 
       {tally === null || tally.length === 0 ? null : (
         <Section title="Lo más votado">
-          <VoteResults players={players} tally={tally} />
+          <VoteResults
+            onOpenPlayer={openPlayer}
+            players={players}
+            tally={tally}
+          />
         </Section>
       )}
 
@@ -87,6 +120,30 @@ export function MatchSheet() {
           </Text>
         </Section>
       ) : null}
+
+      {/* Las gráficas van al final, después del acta. Lo que se viene a ver es
+          quién ganó y quién marcó; esto es para quedarse a discutirlo, y quien
+          solo quería el resultado no debería tener que pasarlo por encima. */}
+      <Section title="Reparto y equilibrio">
+        <MatchDials balance={match.balance} teams={rankedTeams(match)} />
+      </Section>
+
+      <Section
+        meta={`${matchGoals(match)} en juego`}
+        title="Quién estuvo metido"
+      >
+        <ContributionChart match={match} />
+      </Section>
+
+      {profiles.length < 2 ? null : (
+        <Section title="Perfil de los equipos">
+          <TeamRadar profiles={profiles} />
+        </Section>
+      )}
+
+      <Section title="Cómo estaban armados">
+        <LineHeatmap match={match} players={players} />
+      </Section>
     </ScrollView>
   );
 }

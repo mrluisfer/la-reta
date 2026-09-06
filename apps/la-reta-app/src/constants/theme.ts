@@ -36,6 +36,20 @@ export const Palette = {
 
   danger: "#E7000B",
   dangerInk: "#FFF1F2",
+
+  /**
+   * El ámbar de las estrellas y de la casaca: `amber-400`/`amber-700` de la
+   * misma paleta que usa la web.
+   *
+   * Es la única excepción a la regla de un solo acento, y tiene motivo: una
+   * estrella de valoración es amarilla en todas partes desde antes de que esta
+   * app existiera, y pintarla de verde no la haría de la casa, la haría
+   * ilegible como estrella. Fuera de las estrellas y las casacas manda el verde.
+   */
+  star: "#FBBF24",
+  starLine: "#E4E4E7",
+  amber: "#B45309",
+  amberSoft: "rgba(180, 83, 9, 0.12)",
 } as const;
 
 export type Tone = keyof typeof Tones;

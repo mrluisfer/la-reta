@@ -29,6 +29,21 @@ export function formatShortDateOnly(value: string) {
   return asDateOnly(value).format("ddd DD MMM");
 }
 
+/**
+ * La fecha partida en piezas, para maquetarla como un taco de calendario en vez
+ * de como una línea de texto: es lo que deja distinguir un partido de otro sin
+ * leer, cuando el historial es una pila de tarjetas casi idénticas.
+ */
+export function dateParts(value: string) {
+  const d = asDateOnly(value);
+  return {
+    weekday: d.format("ddd"),
+    day: d.format("DD"),
+    month: d.format("MMM"),
+    year: d.format("YYYY"),
+  };
+}
+
 export function formatTime(value: ConfigType) {
   return dayjs(value).locale("es-mx").format("HH:mm");
 }

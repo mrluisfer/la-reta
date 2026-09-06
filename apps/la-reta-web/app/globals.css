@@ -147,9 +147,17 @@
   --duration-exit: 150ms;
   --duration-enter: 210ms;
   --duration-move: 400ms;
+
+  /* Relleno de las barras proporcionales (tabla de goleadores). Es el verde de
+     la marca rebajado hasta quedar detrás del texto sin competir con él. El
+     porcentaje cambia por tema a propósito: sobre blanco basta un velo, sobre
+     el fondo oscuro hace falta bastante más para que se lea como verde y no
+     como una sombra gris. */
+  --bar-fill: color-mix(in oklab, var(--primary) 13%, transparent);
 }
 
 .dark {
+  --bar-fill: color-mix(in oklab, var(--primary) 34%, transparent);
   --background: oklch(14.1% 0.005 285.823deg);
   --foreground: oklch(98.5% 0 0deg);
   --card: oklch(21% 0.006 285.885deg);
@@ -515,6 +523,118 @@
         animation-timeline: view();
       }
     }
+  }
+
+  /**
+   * Panel que se enciende con el color de su equipo solo mientras se trabaja
+   * en él: en reposo es una tarjeta neutra como cualquier otra.
+   *
+   * Sustituye al filo de color pegado al borde superior. Ese filo estaba
+   * siempre encendido, así que no señalaba nada —con cuatro equipos, cuatro
+   * franjas compitiendo— y ensuciaba la silueta de la tarjeta. Pintarlo solo
+   * en `:focus-within` convierte el color en información: dice dónde estás
+   * escribiendo.
+   *
+   * `--team` lo aporta cada tarjeta. Todo son propiedades que el compositor
+   * resuelve solo, sin JS de por medio.
+   */
+  .team-panel {
+    border-color: var(--border);
+    background-color: transparent;
+    transition:
+      background-color 200ms ease-out,
+      border-color 200ms ease-out,
+      box-shadow 200ms ease-out;
+  }
+
+  .team-panel:focus-within {
+    border-color: color-mix(in oklab, var(--team) 55%, transparent);
+    background-color: color-mix(in oklab, var(--team) 7%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--team) 14%, transparent);
+  }
+
+  @media (hover: hover) {
+    .team-panel:hover:not(:focus-within) {
+      border-color: color-mix(in oklab, var(--team) 30%, transparent);
+    }
+  }
+
+  /**
+   * Tarjeta de premio de la votación (golazo / error / figura), bañada por el
+   * color de su categoría (`--accent`).
+   *
+   * El color entra como un halo que cae desde arriba, no como una franja
+   * pastel pegada al borde: así la tarjeta entera pertenece a su categoría y a
+   * un metro de la pantalla se distingue el golazo del error sin leer la
+   * etiqueta.
+   */
+  .award-card {
+    background-image: radial-gradient(
+      120% 80% at 50% 0%,
+      color-mix(in oklab, var(--accent) 16%, transparent) 0%,
+      transparent 70%
+    );
+    box-shadow: inset 0 0 0 1px
+      color-mix(in oklab, var(--accent) 30%, transparent);
+    transition:
+      box-shadow 300ms ease-out,
+      transform 300ms ease-out;
+  }
+
+  @media (hover: hover) {
+    .award-card:hover {
+      box-shadow:
+        inset 0 0 0 1px color-mix(in oklab, var(--accent) 55%, transparent),
+        0 12px 28px -12px color-mix(in oklab, var(--accent) 45%, transparent);
+    }
+  }
+
+  /**
+   * Cabecera de una alineación, con el color de su equipo (`--team`) como velo
+   * que se desvanece hacia el contenido. Da pertenencia a la tarjeta entera sin
+   * recurrir a una franja de color pegada al borde.
+   */
+  .team-header {
+    background-image: linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--team) 14%, transparent),
+      transparent
+    );
+  }
+
+  /**
+   * Fila que se tiñe del color de su equipo al pasar el puntero o al recibir
+   * foco de teclado. Cada fila aporta su `--team`.
+   *
+   * Reemplaza a la barra de fondo proporcional que llevaban las alineaciones:
+   * con quince jugadores en pantalla eran quince barras compitiendo, y la
+   * comparación de goles ya la resuelve el dónut de reparto. Aquí el color
+   * responde a dónde está el puntero, que es información, no decoración.
+   */
+  .row-tint {
+    transition: background-color 160ms ease-out;
+  }
+
+  .row-tint:hover,
+  .row-tint:focus-within {
+    background-color: color-mix(in oklab, var(--team) 12%, transparent);
+  }
+
+  /**
+   * Barra proporcional pintada como fondo de la fila, no como un elemento
+   * aparte: cero nodos extra y no estorba al texto de encima. El degradado se
+   * apaga en los últimos puntos porcentuales en vez de cortarse en seco, que
+   * es lo que hacía que el borde se viera como un recorte.
+   *
+   * Cada fila aporta su `--pct`; el color sale del tema, así que claro y
+   * oscuro se resuelven solos.
+   */
+  .bar-fill {
+    background-image: linear-gradient(
+      to right,
+      var(--bar-fill) calc(var(--pct) - 7%),
+      transparent var(--pct)
+    );
   }
 
   /**

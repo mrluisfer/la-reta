@@ -1,5 +1,22 @@
-import { rotatingWords } from "@/constants/rotatingWords";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import type { Position } from "@/lib/constants";
+import type {
+  GeneratedReta,
+  Idea,
+  Match,
+  Player,
+  PlayerComment,
+  PlayerSignup,
+  Report,
+  RetaWord,
+  StatHistory,
+} from "@/lib/db";
+import type { VoteCategory } from "@/lib/match-votes";
+import type { RecentSplit } from "@/lib/team-balancer";
+import type { TeamKey } from "@/lib/teams";
+import { rotatingWords } from "@/constants/rotatingWords";
 import {
   casacaAssignments,
   commentReactions,
@@ -16,22 +33,9 @@ import {
   playerStatHistory,
   reports,
   retaWords,
-  type GeneratedReta,
-  type Idea,
-  type Match,
-  type Player,
-  type PlayerComment,
-  type PlayerSignup,
-  type Report,
-  type RetaWord,
-  type StatHistory,
 } from "@/lib/db";
-import { candidateKey, type VoteCategory } from "@/lib/match-votes";
-import type { RecentSplit } from "@/lib/team-balancer";
-import { isTeamKey, type TeamKey } from "@/lib/teams";
-import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
-import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { candidateKey } from "@/lib/match-votes";
+import { isTeamKey } from "@/lib/teams";
 import "server-only";
 
 /**
@@ -44,7 +48,9 @@ function playerImageMap(): Map<number, string> {
   try {
     for (const file of readdirSync(join(process.cwd(), "public", "players"))) {
       const id = Number(file.replace(/\.[^.]+$/, ""));
-      if (!Number.isNaN(id)) map.set(id, `/players/${file}`);
+      if (!Number.isNaN(id)) {
+        map.set(id, `/players/${file}`);
+      }
     }
   } catch {
     // folder missing — fall back to whatever photoUrl the rows already have
@@ -52,24 +58,32 @@ function playerImageMap(): Map<number, string> {
   return map;
 }
 
-/** Overlays the local `public/players/<id>` image when present. */
+/**
+Overlays the local `public/players/<id>` image when present.
+*/
 function withLocalPhoto(player: Player, images: Map<number, string>): Player {
   const local = images.get(player.id);
   return local ? { ...player, photoUrl: local } : player;
 }
 
-/** All players, strongest first. */
+/**
+All players, strongest first.
+*/
 export async function getPlayers(): Promise<Player[]> {
   const rows = await db.select().from(players).orderBy(desc(players.overall));
   const images = playerImageMap();
   return rows.map((p) => withLocalPhoto(p, images));
 }
 
-/** Id del jugador vinculado a esta cuenta de Clerk, o null (una vinculación por cuenta). */
+/**
+Id del jugador vinculado a esta cuenta de Clerk, o null (una vinculación por cuenta).
+*/
 export async function getOwnedPlayerId(
-  userId: string | null | undefined,
+  userId: string | null | undefined
 ): Promise<number | null> {
-  if (!userId) return null;
+  if (!userId) {
+    return null;
+  }
   const [row] = await db
     .select({ id: players.id })
     .from(players)
@@ -84,29 +98,35 @@ export async function getPlayerById(id: number): Promise<Player | null> {
     .from(players)
     .where(eq(players.id, id))
     .limit(1);
-  if (!rows[0]) return null;
+  if (!rows[0]) {
+    return null;
+  }
   return withLocalPhoto(rows[0], playerImageMap());
 }
 
-/** Comments on a player, oldest first (chat order). */
+/**
+Comments on a player, oldest first (chat order).
+*/
 export async function getPlayerComments(
-  playerId: number,
+  playerId: number
 ): Promise<PlayerComment[]> {
-  return db
+  return await db
     .select()
     .from(playerComments)
     .where(
       and(
         eq(playerComments.playerId, playerId),
-        eq(playerComments.deleted, false),
-      ),
+        eq(playerComments.deleted, false)
+      )
     )
     .orderBy(asc(playerComments.createdAt));
 }
 
-/** Reaction counts per comment for a player: `{ [commentId]: { [emoji]: n } }`. */
+/**
+Reaction counts per comment for a player: `{ [commentId]: { [emoji]: n } }`.
+*/
 export async function getCommentReactions(
-  playerId: number,
+  playerId: number
 ): Promise<Record<number, Record<string, number>>> {
   const rows = await db
     .select({
@@ -117,7 +137,7 @@ export async function getCommentReactions(
     .from(commentReactions)
     .innerJoin(
       playerComments,
-      eq(commentReactions.commentId, playerComments.id),
+      eq(commentReactions.commentId, playerComments.id)
     )
     .where(eq(playerComments.playerId, playerId))
     .groupBy(commentReactions.commentId, commentReactions.emoji);
@@ -129,18 +149,166 @@ export async function getCommentReactions(
   return out;
 }
 
-/** Attribute snapshots for a player, oldest first (for charting progress). */
+/**
+Attribute snapshots for a player, oldest first (for charting progress).
+*/
 export async function getPlayerHistory(
-  playerId: number,
+  playerId: number
 ): Promise<StatHistory[]> {
-  return db
+  return await db
     .select()
     .from(playerStatHistory)
     .where(eq(playerStatHistory.playerId, playerId))
     .orderBy(asc(playerStatHistory.recordedAt));
 }
 
-export type PlayerGoalHistoryItem = {
+/**
+ * El rastro que la reta ha ido dejando sobre un jugador y que no cabe en su
+ * fila: cómo han cambiado sus atributos, qué premios se ha llevado, cuántas
+ * veces le tocó lavar las casacas y qué le dicen los demás.
+ *
+ * Va en una sola consulta compuesta y no en cuatro endpoints porque es una sola
+ * pantalla: la ficha los enseña juntos o no los enseña.
+ */
+export interface PlayerProfile {
+  /**
+   * Instantáneas de atributos, de la más vieja a la más nueva.
+   */
+  history: {
+    pace: number;
+    shooting: number;
+    passing: number;
+    dribbling: number;
+    defending: number;
+    physical: number;
+    overall: number;
+    recordedAt: string;
+  }[];
+  /**
+   * Votaciones ganadas por categoría, sumando los partidos.
+   */
+  awards: { figura: number; gol: number; error: number };
+  /**
+   * Veces que la ruleta le encargó las casacas.
+   */
+  casacas: number;
+  /**
+   * Nota media de los comentarios que la traen, y cuántos la pusieron.
+   */
+  rating: { average: number | null; votes: number };
+  comments: {
+    id: number;
+    author: string | null;
+    authorImageUrl: string | null;
+    body: string;
+    rating: number | null;
+    createdAt: string;
+    /**
+     * Lo escribió quien está mirando. Se resuelve en el servidor y viaja como
+     * booleano: mandar el `authorId` de Clerk repartiría identificadores de
+     * cuenta en una respuesta pública solo para que el cliente compare.
+     */
+    mine: boolean;
+  }[];
+}
+
+/**
+ * Cuántos comentarios lleva la ficha, como mucho, a la app.
+ */
+const PROFILE_COMMENT_LIMIT = 20;
+
+export async function getPlayerProfile(
+  playerId: number,
+  /** Cuenta de Clerk de quien mira, para marcar sus propios comentarios. */
+  viewerId?: string | null
+): Promise<PlayerProfile> {
+  const [history, awardRows, casacaRows, commentRows] = await Promise.all([
+    db
+      .select({
+        pace: playerStatHistory.pace,
+        shooting: playerStatHistory.shooting,
+        passing: playerStatHistory.passing,
+        dribbling: playerStatHistory.dribbling,
+        defending: playerStatHistory.defending,
+        physical: playerStatHistory.physical,
+        overall: playerStatHistory.overall,
+        recordedAt: playerStatHistory.recordedAt,
+      })
+      .from(playerStatHistory)
+      .where(eq(playerStatHistory.playerId, playerId))
+      .orderBy(asc(playerStatHistory.recordedAt)),
+    db
+      .select({
+        category: matchVotes.category,
+        count: sql<number>`count(*)`.mapWith(Number),
+      })
+      .from(matchVotes)
+      .where(eq(matchVotes.playerId, playerId))
+      .groupBy(matchVotes.category),
+    db
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
+      .from(casacaAssignments)
+      .where(eq(casacaAssignments.playerId, playerId)),
+    db
+      .select({
+        id: playerComments.id,
+        author: playerComments.author,
+        authorImageUrl: playerComments.authorImageUrl,
+        body: playerComments.body,
+        rating: playerComments.rating,
+        createdAt: playerComments.createdAt,
+        authorId: playerComments.authorId,
+      })
+      .from(playerComments)
+      .where(
+        and(
+          eq(playerComments.playerId, playerId),
+          eq(playerComments.deleted, false)
+        )
+      )
+      .orderBy(desc(playerComments.createdAt))
+      .limit(PROFILE_COMMENT_LIMIT),
+  ]);
+
+  const awards = { figura: 0, gol: 0, error: 0 };
+  for (const row of awardRows) {
+    awards[row.category] = row.count;
+  }
+
+  // La nota media sale de los comentarios traídos, que son los últimos veinte.
+  // Con una ficha muy comentada la media dejaría de ser la de toda su historia;
+  // hoy nadie pasa de cinco, y cuando alguien pase, esto se calcula en SQL.
+  const rated = commentRows.filter((row) => row.rating !== null);
+  const average =
+    rated.length === 0
+      ? null
+      : rated.reduce((total, row) => total + (row.rating ?? 0), 0) /
+        rated.length;
+
+  return {
+    // Las fechas salen en ISO: JSON no tiene tipo fecha, y dejar que
+    // `JSON.stringify` las convierta por su cuenta esconde el contrato.
+    history: history.map((row) => {
+      const recordedAt = row.recordedAt.toISOString();
+      return { ...row, recordedAt };
+    }),
+    awards,
+    casacas: casacaRows[0]?.count ?? 0,
+    rating: { average, votes: rated.length },
+    comments: commentRows.map((row) => {
+      const { authorId, ...rest } = row;
+      return {
+        ...rest,
+        createdAt: row.createdAt.toISOString(),
+        // Sin sesión nadie es dueño de nada, y un `authorId` nulo en la fila
+        // (comentarios anónimos de antes de Clerk) tampoco puede empatar.
+        mine: viewerId != null && authorId === viewerId,
+      };
+    }),
+  };
+}
+
+export interface PlayerGoalHistoryItem {
   matchId: number;
   playedAt: string;
   teamAName: string;
@@ -149,17 +317,21 @@ export type PlayerGoalHistoryItem = {
   scoreB: number;
   balance: number;
   durationSec: number | null;
-  /** Marcador completo cuando la reta fue de 3+ equipos (ver `matchTeams`). */
+  /**
+  Marcador completo cuando la reta fue de 3+ equipos (ver `matchTeams`).
+  */
   teams: { key: string; name: string; score: number }[] | null;
   team: string | null;
   goals: number;
-};
+}
 
-/** Goal-scoring history for one player, newest match first. */
+/**
+Goal-scoring history for one player, newest match first.
+*/
 export async function getPlayerGoalHistory(
-  playerId: number,
+  playerId: number
 ): Promise<PlayerGoalHistoryItem[]> {
-  return db
+  return await db
     .select({
       matchId: matches.id,
       playedAt: matches.playedAt,
@@ -180,33 +352,41 @@ export async function getPlayerGoalHistory(
 }
 
 // Ideas
-/** All ideas, newest first. */
+/**
+All ideas, newest first.
+*/
 export async function getIdeas(): Promise<Idea[]> {
-  return db.select().from(ideas).orderBy(desc(ideas.createdAt));
+  return await db.select().from(ideas).orderBy(desc(ideas.createdAt));
 }
 
 // Reports
-/** Private admin reports, newest first. */
+/**
+Private admin reports, newest first.
+*/
 export async function getReports(): Promise<Report[]> {
-  return db.select().from(reports).orderBy(desc(reports.createdAt));
+  return await db.select().from(reports).orderBy(desc(reports.createdAt));
 }
 
 // Player signups
-/** Signup requests to become a player, pending first then newest. */
+/**
+Signup requests to become a player, pending first then newest.
+*/
 export async function getPlayerSignups(): Promise<PlayerSignup[]> {
-  return db
+  return await db
     .select()
     .from(playerSignups)
     .orderBy(
       // pendientes primero, luego por fecha desc
       sql`case when ${playerSignups.status} = 'pendiente' then 0 else 1 end`,
-      desc(playerSignups.createdAt),
+      desc(playerSignups.createdAt)
     );
 }
 
-/** One signup by id (to prefill the new-player form). */
+/**
+One signup by id (to prefill the new-player form).
+*/
 export async function getPlayerSignupById(
-  id: number,
+  id: number
 ): Promise<PlayerSignup | null> {
   const [row] = await db
     .select()
@@ -216,7 +396,9 @@ export async function getPlayerSignupById(
   return row ?? null;
 }
 
-/** How many signups are still waiting — for the admin badge. */
+/**
+How many signups are still waiting — for the admin badge.
+*/
 export async function getPendingSignupCount(): Promise<number> {
   const [row] = await db
     .select({ n: sql<number>`count(*)`.mapWith(Number) })
@@ -226,7 +408,7 @@ export async function getPendingSignupCount(): Promise<number> {
 }
 
 // Matches
-export type Scorer = {
+export interface Scorer {
   playerId: number | null;
   name: string;
   displayName: string;
@@ -236,10 +418,16 @@ export type Scorer = {
   goals: number;
   assists: number;
   isGuest: boolean;
-};
+  /** Overall del jugador; null en invitados, que no tienen ficha. */
+  overall: number | null;
+  /** Posición principal; null en invitados. */
+  position: string | null;
+}
 export type MatchWithScorers = Match & { scorers: Scorer[] };
 
-/** Past matches (newest first) with their goal scorers attached. */
+/**
+Past matches (newest first) with their goal scorers attached.
+*/
 export async function getMatches(): Promise<MatchWithScorers[]> {
   const rows = await db
     .select()
@@ -258,6 +446,8 @@ export async function getMatches(): Promise<MatchWithScorers[]> {
       displayName: players.displayName,
       nationality: players.nationality,
       photoUrl: players.photoUrl,
+      overall: players.overall,
+      position: players.position,
     })
     .from(matchGoals)
     .leftJoin(players, eq(matchGoals.playerId, players.id));
@@ -273,13 +463,15 @@ export async function getMatches(): Promise<MatchWithScorers[]> {
       displayName: g.displayName ?? g.guestName ?? g.name ?? "Invitado",
       nationality: g.nationality ?? "mx",
       photoUrl:
-        g.playerId != null
-          ? (imageMap.get(g.playerId) ?? g.photoUrl ?? null)
-          : null,
+        g.playerId == null
+          ? null
+          : (imageMap.get(g.playerId) ?? g.photoUrl ?? null),
       team: g.team,
       goals: g.goals,
       assists: g.assists,
       isGuest: guest,
+      overall: g.overall ?? null,
+      position: g.position ?? null,
     });
     byMatch.set(g.matchId, list);
   }
@@ -290,16 +482,20 @@ export async function getMatches(): Promise<MatchWithScorers[]> {
   }));
 }
 
-/** A single match with its scorers, for the edit screen. */
+/**
+A single match with its scorers, for the edit screen.
+*/
 export async function getMatchById(
-  id: number,
+  id: number
 ): Promise<MatchWithScorers | null> {
   const [m] = await db
     .select()
     .from(matches)
     .where(eq(matches.id, id))
     .limit(1);
-  if (!m) return null;
+  if (!m) {
+    return null;
+  }
 
   const goalRows = await db
     .select({
@@ -312,6 +508,8 @@ export async function getMatchById(
       displayName: players.displayName,
       nationality: players.nationality,
       photoUrl: players.photoUrl,
+      overall: players.overall,
+      position: players.position,
     })
     .from(matchGoals)
     .leftJoin(players, eq(matchGoals.playerId, players.id))
@@ -334,21 +532,25 @@ export async function getMatchById(
         goals: g.goals,
         assists: g.assists,
         isGuest: g.playerId == null,
+        overall: g.overall ?? null,
+        position: g.position ?? null,
       }))
       .sort((a, b) => b.goals - a.goals),
   };
 }
 
 // Match awards (votación)
-export type VoteTally = {
+export interface VoteTally {
   category: VoteCategory;
   playerId: number | null;
   guestName: string | null;
   name: string;
   count: number;
-};
+}
 
-/** Conteo de votos por (categoría, candidato) de un partido, con nombres. */
+/**
+Conteo de votos por (categoría, candidato) de un partido, con nombres.
+*/
 export async function getMatchVoteTally(matchId: number): Promise<VoteTally[]> {
   const rows = await db
     .select({
@@ -365,7 +567,7 @@ export async function getMatchVoteTally(matchId: number): Promise<VoteTally[]> {
       matchVotes.category,
       matchVotes.playerId,
       matchVotes.guestName,
-      players.name,
+      players.name
     );
   return rows.map((r) => ({
     category: r.category as VoteCategory,
@@ -376,12 +578,16 @@ export async function getMatchVoteTally(matchId: number): Promise<VoteTally[]> {
   }));
 }
 
-/** Votos del votante actual: `category → candidateKey`. Vacío sin votante. */
+/**
+Votos del votante actual: `category → candidateKey`. Vacío sin votante.
+*/
 export async function getMyMatchVotes(
   matchId: number,
-  voterId: string | null | undefined,
+  voterId: string | null | undefined
 ): Promise<Record<string, string>> {
-  if (!voterId) return {};
+  if (!voterId) {
+    return {};
+  }
   const rows = await db
     .select({
       category: matchVotes.category,
@@ -390,19 +596,22 @@ export async function getMyMatchVotes(
     })
     .from(matchVotes)
     .where(
-      and(eq(matchVotes.matchId, matchId), eq(matchVotes.voterId, voterId)),
+      and(eq(matchVotes.matchId, matchId), eq(matchVotes.voterId, voterId))
     );
   const out: Record<string, string> = {};
-  for (const r of rows)
+  for (const r of rows) {
     out[r.category] = candidateKey({
       playerId: r.playerId,
       guestName: r.guestName,
     });
+  }
   return out;
 }
 
-export type TopScorer = {
-  /** Stable list key: `p:<id>` for roster players, `g:<name>` for guests. */
+export interface TopScorer {
+  /**
+  Stable list key: `p:<id>` for roster players, `g:<name>` for guests.
+  */
   key: string;
   playerId: number | null;
   name: string;
@@ -410,11 +619,13 @@ export type TopScorer = {
   nationality: string;
   goals: number;
   assists: number;
-  /** Goles + asistencias — el ordenamiento de la tabla combinada. */
+  /**
+  Goles + asistencias — el ordenamiento de la tabla combinada.
+  */
   contributions: number;
   matches: number;
   isGuest: boolean;
-};
+}
 
 /**
  * Goal + assist tally across all matches — roster players AND guests — ordered by
@@ -441,7 +652,7 @@ export async function getTopScorers(): Promise<TopScorer[]> {
       assists: totalAssists.mapWith(Number),
       contributions: contributions.mapWith(Number),
       matches: sql<number>`count(distinct ${matchGoals.matchId})`.mapWith(
-        Number,
+        Number
       ),
     })
     .from(matchGoals)
@@ -451,7 +662,7 @@ export async function getTopScorers(): Promise<TopScorer[]> {
       matchGoals.guestName,
       players.name,
       players.displayName,
-      players.nationality,
+      players.nationality
     )
     // Aparece quien haya aportado algo (gol o asistencia).
     .having(sql`sum(${matchGoals.goals} + ${matchGoals.assists}) > 0`)
@@ -491,7 +702,9 @@ export async function getRecentSplits(limit = 20): Promise<RecentSplit[]> {
     .from(generatedRetas)
     .orderBy(desc(generatedRetas.createdAt))
     .limit(limit);
-  if (retas.length === 0) return [];
+  if (retas.length === 0) {
+    return [];
+  }
 
   const rows = await db
     .select({
@@ -503,15 +716,19 @@ export async function getRecentSplits(limit = 20): Promise<RecentSplit[]> {
     .where(
       inArray(
         generatedRetaPlayers.retaId,
-        retas.map((r) => r.id),
-      ),
+        retas.map((r) => r.id)
+      )
     );
 
   const byReta = new Map<number, Map<string, number[]>>();
-  for (const r of retas) byReta.set(r.id, new Map());
+  for (const r of retas) {
+    byReta.set(r.id, new Map());
+  }
   for (const row of rows) {
     const split = byReta.get(row.retaId);
-    if (!split || row.playerId == null) continue; // guests excluded from variety
+    if (!split || row.playerId == null) {
+      continue;
+    } // guests excluded from variety
     const side = split.get(row.team) ?? [];
     side.push(row.playerId);
     split.set(row.team, side);
@@ -528,7 +745,7 @@ export function retaTeams(
   reta: Pick<
     GeneratedReta,
     "teams" | "teamAName" | "teamBName" | "ratingA" | "ratingB"
-  >,
+  >
 ): { key: TeamKey; name: string; rating: number }[] {
   if (reta.teams?.length) {
     return reta.teams.map((t) => ({
@@ -538,12 +755,12 @@ export function retaTeams(
     }));
   }
   return [
-    { key: "A" as TeamKey, name: reta.teamAName, rating: reta.ratingA },
-    { key: "B" as TeamKey, name: reta.teamBName, rating: reta.ratingB },
+    { key: "A", name: reta.teamAName, rating: reta.ratingA },
+    { key: "B", name: reta.teamBName, rating: reta.ratingB },
   ];
 }
 
-export type GeneratedRetaPlayerRow = {
+export interface GeneratedRetaPlayerRow {
   playerId: number | null;
   team: string;
   role: Position;
@@ -552,21 +769,25 @@ export type GeneratedRetaPlayerRow = {
   displayName: string;
   nationality: string;
   isGuest: boolean;
-};
+}
 export type GeneratedRetaWithPlayers = GeneratedReta & {
   players: GeneratedRetaPlayerRow[];
 };
 
-/** Generated retas (newest first) with their player assignments attached. */
+/**
+Generated retas (newest first) with their player assignments attached.
+*/
 export async function getGeneratedRetas(
-  limit = 200,
+  limit = 200
 ): Promise<GeneratedRetaWithPlayers[]> {
   const retas = await db
     .select()
     .from(generatedRetas)
     .orderBy(desc(generatedRetas.createdAt), desc(generatedRetas.id))
     .limit(limit);
-  if (retas.length === 0) return [];
+  if (retas.length === 0) {
+    return [];
+  }
 
   const rows = await db
     .select({
@@ -585,8 +806,8 @@ export async function getGeneratedRetas(
     .where(
       inArray(
         generatedRetaPlayers.retaId,
-        retas.map((r) => r.id),
-      ),
+        retas.map((r) => r.id)
+      )
     );
 
   const byReta = new Map<number, GeneratedRetaPlayerRow[]>();
@@ -610,13 +831,15 @@ export async function getGeneratedRetas(
 }
 
 // Reta words
-/** All contributed words, newest first (for the /palabras wall). */
+/**
+All contributed words, newest first (for the /palabras wall).
+*/
 export async function getRetaWords(): Promise<RetaWord[]> {
-  return db.select().from(retaWords).orderBy(desc(retaWords.createdAt));
+  return await db.select().from(retaWords).orderBy(desc(retaWords.createdAt));
 }
 
 // Casacas
-export type CasacaAssignmentRow = {
+export interface CasacaAssignmentRow {
   id: number;
   playerId: number | null;
   displayName: string;
@@ -624,11 +847,13 @@ export type CasacaAssignmentRow = {
   isGuest: boolean;
   spunByName: string | null;
   createdAt: Date;
-};
+}
 
-/** Casaca-washing turns, newest first (roster join or guest name). */
+/**
+Casaca-washing turns, newest first (roster join or guest name).
+*/
 export async function getCasacaAssignments(
-  limit = 24,
+  limit = 24
 ): Promise<CasacaAssignmentRow[]> {
   const rows = await db
     .select({
@@ -656,7 +881,9 @@ export async function getCasacaAssignments(
   }));
 }
 
-/** Words for the rotating banner: base list + contributions, de-duplicated. */
+/**
+Words for the rotating banner: base list + contributions, de-duplicated.
+*/
 export async function getBannerWords(): Promise<string[]> {
   const rows = await db.select({ word: retaWords.word }).from(retaWords);
   const seen = new Set<string>();

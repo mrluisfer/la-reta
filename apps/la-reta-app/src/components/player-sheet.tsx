@@ -12,10 +12,21 @@ import Animated, {
 import { FifaCard } from "@/components/fifa-card";
 import { isClerkConfigured } from "@/components/auth-provider";
 import { Notice } from "@/components/notice";
+import {
+  OverallTrend,
+  StatChangeLog,
+  TrendHeadline,
+} from "@/components/overall-trend";
 import { PlayerAvatar } from "@/components/player-avatar";
+import { hasHonours, HonoursStrip } from "@/components/player-honours";
+import { TeammateList } from "@/components/player-mates";
+import { PerformanceCard } from "@/components/player-record";
+import { PlayerVoices, RatingSummary } from "@/components/player-voices";
+import { StatBars } from "@/components/stat-bars";
 import { StatRadar } from "@/components/stat-radar";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
+import { Reveal } from "@/components/ui/reveal";
 import { Section } from "@/components/ui/section";
 import { Surface } from "@/components/ui/surface";
 import { Text } from "@/components/ui/text";
@@ -23,31 +34,43 @@ import {
   BottomTabInset,
   MaxContentWidth,
   Palette,
+  Radius,
   Spacing,
 } from "@/constants/theme";
+import { usePlayerProfile } from "@/hooks/use-player-profile";
 import { useReta } from "@/hooks/use-reta";
 import { claimPlayer, loadOwnedPlayerId } from "@/lib/signup";
 import { formatMatchDate } from "@/lib/dates";
 import {
   FOOT_LABEL,
   formatPositions,
+  entryResult,
   overallRank,
   playerGoalHistory,
+  playerRecord,
   playerTally,
+  playerTeammates,
   squadAverages,
+  statDeltas,
   type GoalEntry,
+  type Result,
 } from "@/lib/players";
 import { cardTier, TIER_LABEL } from "@/lib/ratings";
 import type { Player } from "@/lib/types";
-import { standingLine } from "@/lib/teams";
+import { standingLine, teamColor } from "@/lib/teams";
 
 /**
  * Ficha completa de un jugador.
  *
- * No pide nada nuevo a la API: el roster y los partidos ya están descargados,
- * así que la carta sale de la lista, los goles de recorrer el historial y la
- * media de la plantilla de promediar el roster. Abrir una ficha es instantáneo
- * y funciona igual sin señal.
+ * **Lo que ya está descargado se pinta al instante.** El roster y los partidos
+ * viven en memoria, así que la carta, el balance, el hexágono y la lista de
+ * apariciones no esperan a nadie: abrir una ficha sigue siendo inmediato y
+ * funciona igual sin señal.
+ *
+ * Lo que no cabe en esas dos listas —cómo han ido cambiando sus atributos, los
+ * premios que le ha votado la reta, las casacas y los comentarios— llega
+ * después por `/api/v1/players/:id/profile`, en una sola petición, y rellena
+ * sus bloques cuando responde. Ninguno de ellos bloquea la pantalla.
  *
  * Vive fuera de `app/` porque la montan dos rutas, una por pestaña
  * (`/jugador/[id]` en Plantilla y `/ficha/[id]` en Inicio). Con una sola ruta
@@ -71,6 +94,7 @@ export function PlayerSheet() {
   const router = useRouter();
   const { players, matches, loading, error, refetch } = useReta();
   const claim = useClaim(refetch);
+  const profile = usePlayerProfile(id);
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scroll = useScrollViewOffset(scrollRef);
@@ -140,9 +164,12 @@ export function PlayerSheet() {
 
   const tally = playerTally(matches, player.id);
   const history = playerGoalHistory(matches, player.id);
+  const record = playerRecord(matches, player.id);
+  const mates = playerTeammates(matches, player.id);
   const averages = squadAverages(players);
   const rank = overallRank(players, player.id);
   const tier = cardTier(player.overall);
+  const deltas = statDeltas(profile.data?.history);
 
   return (
     <View style={{ flex: 1, backgroundColor: Palette.paper }}>
@@ -163,6 +190,14 @@ export function PlayerSheet() {
         scrollEventThrottle={16}
       >
         <Stack.Screen options={{ title: player.displayName }} />
+
+        {/* La nota que le pone la reta, arriba y sin tarjeta: es un dato de la
+            ficha —como el puesto o el OVR—, no una sección. Los comentarios de
+            los que sale viven al final. */}
+        <RatingSummary
+          average={profile.data?.rating.average ?? null}
+          votes={profile.data?.rating.votes ?? 0}
+        />
 
         {/* Solo si la ficha no tiene dueño y tu cuenta no tiene otra. Es el
             único sitio donde la pregunta tiene sentido: estás mirando la ficha
@@ -209,49 +244,91 @@ export function PlayerSheet() {
           </Surface>
         ) : null}
 
+        {profile.pending ||
+        hasHonours(profile.data?.awards ?? null, profile.data?.casacas ?? 0) ? (
+          <Section title="Palmarés">
+            <Reveal>
+              <HonoursStrip
+                awards={profile.data?.awards ?? null}
+                casacas={profile.data?.casacas ?? 0}
+                pending={profile.pending}
+              />
+            </Reveal>
+          </Section>
+        ) : null}
+
         <Section
           meta={rank ? `#${rank.rank} de ${rank.total}` : undefined}
           title="Rendimiento"
         >
-          <Surface style={{ flexDirection: "row" }}>
-            <Tally icon="ball" label="Goles" value={tally.goals} />
-            <Divider />
-            <Tally icon="arrow" label="Asistencias" value={tally.assists} />
-            <Divider />
-            <Tally
-              icon="trophy"
-              label="G + A"
-              value={tally.goals + tally.assists}
-            />
-          </Surface>
+          <PerformanceCard record={record} tally={tally} />
         </Section>
 
         <Section meta={`${player.overall} OVR`} title="Atributos">
           <Surface
             style={{
-              alignItems: "center",
-              gap: Spacing.three,
+              gap: Spacing.four,
               padding: Spacing.four,
             }}
           >
-            <StatRadar compare={averages} player={player} />
+            <View style={{ alignItems: "center", gap: Spacing.three }}>
+              <StatRadar compare={averages} player={player} />
 
-            <View
-              style={{
-                flexDirection: "row",
-                gap: Spacing.four,
-                paddingTop: Spacing.two,
-                borderTopWidth: 1,
-                borderTopColor: Palette.hairline,
-                alignSelf: "stretch",
-                justifyContent: "center",
-              }}
-            >
-              <LegendItem color={Palette.accent} label={player.displayName} />
-              <LegendItem dashed label="Media de la reta" />
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: Spacing.four,
+                  paddingTop: Spacing.two,
+                  borderTopWidth: 1,
+                  borderTopColor: Palette.hairline,
+                  alignSelf: "stretch",
+                  justifyContent: "center",
+                }}
+              >
+                <LegendItem color={Palette.accent} label={player.displayName} />
+                <LegendItem dashed label="Media de la reta" />
+              </View>
+            </View>
+
+            {/* Las mismas seis cifras, ahora medibles: el radar da la silueta y
+                las barras dan la distancia contra la media. */}
+            <View style={{ gap: Spacing.three }}>
+              <StatBars average={averages} deltas={deltas} player={player} />
+              <Text tone="faint" variant="caption">
+                La raya de cada barra es la media de la reta. A la derecha, lo
+                que cambió en su último ajuste.
+              </Text>
             </View>
           </Surface>
         </Section>
+
+        <Section title="Cómo ha evolucionado">
+          <Reveal>
+            <Surface style={{ gap: Spacing.four, padding: Spacing.four }}>
+              <TrendHeadline history={profile.data?.history ?? null} />
+              <OverallTrend
+                history={profile.data?.history ?? null}
+                pending={profile.pending}
+              />
+              <StatChangeLog history={profile.data?.history ?? null} />
+            </Surface>
+          </Reveal>
+        </Section>
+
+        {mates.length === 0 ? null : (
+          <Section title="Con quién juega">
+            <TeammateList
+              mates={mates}
+              onOpen={(mateId) =>
+                router.push({
+                  pathname: "/jugador/[id]",
+                  params: { id: String(mateId) },
+                })
+              }
+              players={players}
+            />
+          </Section>
+        )}
 
         {history.length === 0 ? null : (
           <Section meta={`${history.length} partidos`} title="Dónde apareció">
@@ -261,6 +338,7 @@ export function PlayerSheet() {
                   entry={entry}
                   key={entry.matchId}
                   last={index === history.length - 1}
+                  result={entryResult(entry)}
                   // La ficha del partido vive en un grupo compartido, así que
                   // se abre dentro de la misma pestaña de la que vienes.
                   onPress={() =>
@@ -283,6 +361,24 @@ export function PlayerSheet() {
             <Detail label="Pie" value={FOOT_LABEL[player.preferredFoot]} />
             <Detail label="Carta" value={TIER_LABEL[tier]} />
           </Surface>
+        </Section>
+
+        {/* Al final del todo: los números de arriba son el jugador, esto es la
+            conversación sobre él. Y es lo único de la ficha donde se escribe,
+            así que cerrar con ello deja el teclado lejos del resto. */}
+        <Section
+          meta={commentMeta(profile.data?.comments.length ?? 0)}
+          title="Lo que dice la reta"
+        >
+          <Reveal>
+            <PlayerVoices
+              canWrite={claim.canComment(player)}
+              comments={profile.data?.comments ?? null}
+              onPosted={profile.refetch}
+              pending={profile.pending}
+              playerId={player.id}
+            />
+          </Reveal>
         </Section>
       </Animated.ScrollView>
 
@@ -388,13 +484,38 @@ function LegendItem({
   );
 }
 
+/** "3 comentarios" para la cabecera; nada cuando no hay ninguno. */
+function commentMeta(count: number): string | undefined {
+  if (count === 0) return undefined;
+  return count === 1 ? "1 comentario" : `${count} comentarios`;
+}
+
+/** Letra y color del resultado, para la pastilla de cada aparición. */
+const RESULT_MARK: Record<Result, { letter: string; color: string }> = {
+  win: { letter: "G", color: Palette.accent },
+  draw: { letter: "E", color: Palette.inkFaint },
+  loss: { letter: "P", color: Palette.danger },
+};
+
+/**
+ * Una aparición en la lista.
+ *
+ * La fila abre con dos marcas antes del texto: la pastilla del resultado y una
+ * barrita del color de su equipo. Antes había que leer "Wapos FC 1 · 3º de 3"
+ * entero para saber cómo acabó, y cinco filas seguidas de eso son cinco frases
+ * casi idénticas. Con la marca, la columna se recorre de un vistazo y el texto
+ * queda para quien quiera el detalle.
+ */
 function GoalRow({
   entry,
   last,
+  result,
   onPress,
 }: {
   entry: GoalEntry;
   last: boolean;
+  /** `null` en las actas viejas, que no apuntaron el equipo. */
+  result: Result | null;
   onPress: () => void;
 }) {
   const parts = [
@@ -405,6 +526,8 @@ function GoalRow({
       ? `${entry.assists} ${entry.assists === 1 ? "asistencia" : "asistencias"}`
       : null,
   ].filter(Boolean);
+
+  const mark = result === null ? null : RESULT_MARK[result];
 
   return (
     <Pressable
@@ -423,6 +546,38 @@ function GoalRow({
           borderBottomColor: Palette.hairline,
         }}
       >
+        <View
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: Radius.sm,
+            borderCurve: "continuous",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: mark?.color ?? Palette.surfaceSunken,
+          }}
+        >
+          <Text
+            style={{
+              color: mark === null ? Palette.inkFaint : Palette.surface,
+            }}
+            variant="caption"
+          >
+            {mark?.letter ?? "—"}
+          </Text>
+        </View>
+
+        {entry.team === null ? null : (
+          <View
+            style={{
+              width: 3,
+              alignSelf: "stretch",
+              borderRadius: Radius.pill,
+              backgroundColor: teamColor(entry.team),
+            }}
+          />
+        )}
+
         <View style={{ flex: 1, gap: Spacing.half }}>
           <Text numberOfLines={1} variant="bodyStrong">
             {standingLine(entry.teams, entry.team)}
@@ -441,30 +596,6 @@ function GoalRow({
       </View>
     </Pressable>
   );
-}
-
-function Tally({
-  icon,
-  label,
-  value,
-}: {
-  icon: "ball" | "arrow" | "trophy";
-  label: string;
-  value: number;
-}) {
-  return (
-    <View style={{ flex: 1, alignItems: "center", gap: Spacing.one }}>
-      <Icon color={Palette.accent} name={icon} size={18} />
-      <Text variant="stat">{value}</Text>
-      <Text tone="faint" variant="eyebrow">
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function Divider() {
-  return <View style={{ width: 1, backgroundColor: Palette.hairline }} />;
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
@@ -522,6 +653,15 @@ function useClaim(refetch: () => void) {
       !player.clerkUserId,
     /** La ficha es tuya: lo dice el servidor, no el `clerkUserId` de la fila. */
     isMine: (player: Player) => ownedId === player.id,
+    /**
+     * Puedes dejar reseña: hay sesión y la ficha no es la tuya.
+     *
+     * Nadie se reseña a sí mismo, y la puerta de la API lo rechaza igual. Aquí
+     * solo se decide si enseñar el formulario: ofrecer algo que va a rebotar
+     * con un 403 es peor que no ofrecerlo.
+     */
+    canComment: (player: Player) =>
+      isClerkConfigured && isSignedIn === true && ownedId !== player.id,
     run: async (playerId: number) => {
       setBusy(true);
       setError(null);

@@ -55,6 +55,10 @@ export function ScorerRace({
     <View style={{ height: data.length * ROW_HEIGHT + AXIS_HEIGHT }}>
       <CartesianChart
         data={data}
+        // Desde cero, por lo mismo que la gráfica de jornadas: una barra vale
+        // lo que mide, y con el suelo pegado al mínimo el último de la tabla se
+        // queda sin barra.
+        domain={{ y: [0, Math.max(...data.map((row) => row.goals))] }}
         domainPadding={{ top: 12, bottom: 12, right: 16 }}
         orientation="horizontal"
         // En horizontal los papeles se cambian: el eje X lleva los goles y el

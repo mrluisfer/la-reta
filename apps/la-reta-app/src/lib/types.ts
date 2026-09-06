@@ -63,6 +63,50 @@ export interface Player extends Record<StatKey, number> {
   clerkUserId?: string | null;
 }
 
+/**
+ * Lo que la reta ha ido dejando escrito sobre un jugador y no cabe en su fila
+ * (/api/v1/players/:id/profile).
+ *
+ * Es lo contrario del roster: el roster es el estado de hoy, esto es el rastro
+ * —cómo llegó a estar así, qué le han votado y qué le dicen—.
+ */
+export interface PlayerProfile {
+  /** Instantáneas de atributos, de la más vieja a la más nueva. */
+  history: StatSnapshot[];
+  awards: PlayerAwards;
+  /** Veces que la ruleta le encargó las casacas. */
+  casacas: number;
+  rating: { average: number | null; votes: number };
+  comments: PlayerComment[];
+}
+
+export interface StatSnapshot extends Record<StatKey, number> {
+  overall: number;
+  recordedAt: string;
+}
+
+export interface PlayerAwards {
+  figura: number;
+  gol: number;
+  error: number;
+}
+
+export interface PlayerComment {
+  id: number;
+  author: string | null;
+  authorImageUrl: string | null;
+  body: string;
+  /** Nota de 1 a 5, cuando quien comentó puso una. */
+  rating: number | null;
+  createdAt: string;
+  /**
+   * Lo escribiste tú. Lo decide el servidor comparando con la sesión; aquí
+   * llega como booleano porque el `authorId` de Clerk no tiene por qué viajar
+   * en una respuesta que puede leer cualquiera.
+   */
+  mine: boolean;
+}
+
 export interface MatchTeam {
   key: string;
   name: string;
@@ -73,7 +117,8 @@ export interface Scorer {
   playerId: number | null;
   name: string;
   displayName: string;
-  team: string;
+  /** Letra del equipo, o `null` en las actas viejas que no la apuntaron. */
+  team: string | null;
   goals: number;
   assists: number;
   isGuest: boolean;
@@ -103,6 +148,11 @@ export interface Match {
   scoreB: number;
   /** Qué tan parejo se sintió, 0 (paliza) … 100 (parejísimo). */
   balance: number;
+  /**
+   * Lo que duró, en segundos. Lo pone el marcador en vivo; los partidos que se
+   * apuntaron a mano después no lo tienen.
+   */
+  durationSec: number | null;
   teams: MatchTeam[] | null;
   /** Nota libre que escribió quien registró el partido. */
   notes: string | null;
