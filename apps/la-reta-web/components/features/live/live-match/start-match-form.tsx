@@ -23,12 +23,17 @@ import {
   RadioIcon,
   UsersIcon,
 } from "lucide-react";
+import { ViewTransition } from "react";
 
 /**
  * Pre-partido: cuántos equipos hay y cómo se llaman. Con 2 es el duelo de
  * siempre; con 3+ arranca la rotación (juegan los dos primeros, el resto espera).
+ *
+ * El movimiento lo llevan `<ViewTransition>`, así que quien pase
+ * `onCountChange` tiene que envolverlo en `startTransition` (lo hace
+ * `LiveMatch`): un `setState` normal no los activa y no se anima nada.
  */
-export function StartMatchForm({
+export const StartMatchForm = ({
   count,
   names,
   onCountChange,
@@ -36,15 +41,15 @@ export function StartMatchForm({
   onSwapTeams,
   onStart,
 }: {
-  count: number;
+  readonly count: number;
   /** Indexado como TEAM_KEYS: [0] = A, [1] = B, … */
-  names: string[];
-  onCountChange: (count: number) => void;
-  onNameChange: (index: number, value: string) => void;
+  readonly names: string[];
+  readonly onCountChange: (count: number) => void;
+  readonly onNameChange: (index: number, value: string) => void;
   /** Intercambia los dos primeros equipos (quién arranca de local). */
-  onSwapTeams: () => void;
-  onStart: () => void;
-}) {
+  readonly onSwapTeams: () => void;
+  readonly onStart: () => void;
+}) => {
   const keys = teamKeys(count);
   return (
     <div className="mx-auto max-w-3xl">
@@ -60,8 +65,8 @@ export function StartMatchForm({
             Configura el marcador antes de arrancar
           </CardTitle>
           <CardDescription className="max-w-2xl text-sm leading-relaxed">
-            Define cuántos equipos hay y cómo se llaman. Con 3 o más, el que
-            gana se queda y entra el siguiente de la fila.
+            Define cuántos equipos hay y cómo se llaman. Cada uno tendrá su
+            botón para apuntarle goles durante toda la reta.
           </CardDescription>
         </CardHeader>
 
@@ -80,66 +85,95 @@ export function StartMatchForm({
                     onClick={() => onCountChange(n)}
                     aria-pressed={count === n}
                     className={cn(
-                      "rounded-[10px] px-3 py-1 font-mono text-xs font-bold tabular-nums transition-colors",
+                      "relative rounded-[10px] px-3 py-1 font-mono text-xs font-bold tabular-nums transition-colors",
                       count === n
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    {n}
+                    {/* La pastilla es un nodo propio y solo existe bajo el
+                        número activo: al cambiar, desaparece de un botón y
+                        aparece en otro con el MISMO `name`, y ese par es lo
+                        que la hace viajar en vez de parpadear. Como clase del
+                        botón activo no habría nada que emparejar. */}
+                    {count === n && (
+                      <ViewTransition
+                        name="live-team-count"
+                        share="count-pill"
+                        default="none"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="bg-background pointer-events-none absolute inset-0 rounded-[10px] shadow-sm"
+                        />
+                      </ViewTransition>
+                    )}
+                    <span className="relative">{n}</span>
                   </button>
-                ),
+                )
               )}
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             {keys.map((key, i) => (
-              <TeamInput
-                key={key}
-                teamKey={key}
-                value={names[i] ?? ""}
-                onChange={(v) => onNameChange(i, v)}
-              />
+              // Sin `default="none"` a propósito: el `update` que deja vivo es
+              // lo que desliza a su nueva celda a las tarjetas que se quedan
+              // cuando entra o sale un equipo.
+              <ViewTransition key={key} enter="team-in" exit="team-out">
+                <TeamInput
+                  teamKey={key}
+                  value={names[i] ?? ""}
+                  onChange={(v) => onNameChange(i, v)}
+                />
+              </ViewTransition>
             ))}
           </div>
 
-          <div className="flex justify-center">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onSwapTeams}
-              aria-label="Intercambiar los dos primeros equipos"
-            >
-              <ArrowRightLeftIcon className="size-4" />
-              Intercambiar {defaultTeamName(keys[0])} y{" "}
-              {defaultTeamName(keys[1])}
-            </Button>
-          </div>
+          {/* Cada equipo que entra empuja estos botones hacia abajo. Solo se
+              anima lo que cuelga de un `<ViewTransition>` activado, y tiene que
+              ser hermano directo de la rejilla que crece o React ni lo mide:
+              sin esto saltan de golpe mientras la tarjeta nueva aparece. */}
+          <ViewTransition>
+            <div className="space-y-5">
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onSwapTeams}
+                  aria-label="Intercambiar los dos primeros equipos"
+                >
+                  <ArrowRightLeftIcon className="size-4" />
+                  Intercambiar {defaultTeamName(keys[0])} y{" "}
+                  {defaultTeamName(keys[1])}
+                </Button>
+              </div>
 
-          <Button
-            size="lg"
-            className="mx-auto flex w-full max-w-xl"
-            onClick={onStart}
-          >
-            <PlayIcon />
-            Iniciar partido en vivo
-          </Button>
+              <Button
+                size="lg"
+                className="mx-auto flex w-full max-w-xl"
+                onClick={onStart}
+              >
+                <PlayIcon />
+                Iniciar partido en vivo
+              </Button>
+            </div>
+          </ViewTransition>
         </CardContent>
       </Card>
     </div>
   );
-}
+};
 
-function TeamInput({
+const TeamInput = ({
   teamKey,
   value,
   onChange,
 }: {
-  teamKey: TeamKey;
-  value: string;
-  onChange: (value: string) => void;
-}) {
+  readonly teamKey: TeamKey;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+}) => {
   const color = TEAM_COLORS[teamKey];
   return (
     <div
@@ -155,4 +189,4 @@ function TeamInput({
       />
     </div>
   );
-}
+};

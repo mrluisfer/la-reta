@@ -181,7 +181,12 @@ export async function updateSignupStatus(
     .update(playerSignups)
     .set({
       status: next,
-      adminNotes: safeText(adminNotes, 2000),
+      // Solo se escribe si el llamador la manda. `AdminSignups` cambia el
+      // estado sin notas, y `safeText(undefined)` es null: tal cual, cada
+      // cambio de estado borraba las notas que ya hubiera.
+      ...(adminNotes !== undefined && {
+        adminNotes: safeText(adminNotes, 2000),
+      }),
       updatedAt: new Date(),
     })
     .where(eq(playerSignups.id, id));

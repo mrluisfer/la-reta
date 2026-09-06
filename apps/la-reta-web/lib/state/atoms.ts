@@ -1,7 +1,8 @@
-import type { Player } from "@/lib/db/schema";
-import { DEFAULT_TEAM_COUNT, type TeamKey } from "@/lib/teams";
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
+import type { TeamKey } from "@/lib/teams";
+import type { Player } from "@/lib/db/schema";
+import { DEFAULT_TEAM_COUNT } from "@/lib/teams";
 
 /**
  * Guest ("de última hora") players added on the fly for a team generation.
@@ -16,7 +17,7 @@ export const guestsAtom = atomWithStorage<Player[]>("reta:guests", []);
  */
 export const selectedIdsAtom = atomWithStorage<number[]>(
   "reta:selected-players",
-  [],
+  []
 );
 
 /**
@@ -32,13 +33,15 @@ export const teamNamesAtom = atomWithStorage<string[]>("reta:team-names", []);
  */
 export const resetTeamsOnEditAtom = atomWithStorage(
   "reta:reset-on-edit",
-  false,
+  false
 );
 
-/** Cuántos equipos genera "Armar equipos" (2 por default, hasta MAX_TEAMS). */
+/**
+Cuántos equipos genera "Armar equipos" (2 por default, hasta MAX_TEAMS).
+*/
 export const teamCountAtom = atomWithStorage<number>(
   "reta:team-count",
-  DEFAULT_TEAM_COUNT,
+  DEFAULT_TEAM_COUNT
 );
 
 /**
@@ -47,7 +50,7 @@ export const teamCountAtom = atomWithStorage<number>(
  */
 export const currentGeneratedRetaIdAtom = atomWithStorage<number | null>(
   "reta:current-generated-reta",
-  null,
+  null
 );
 
 /**
@@ -56,12 +59,14 @@ export const currentGeneratedRetaIdAtom = atomWithStorage<number | null>(
  * team names + attendance, guests included) and then clears it — nothing is
  * submitted automatically. Persisted so it survives the navigation to /matches.
  */
-export type MatchPrefill = {
+export interface MatchPrefill {
   teamAName: string;
   teamBName: string;
   playedAt?: string;
   generatedRetaId?: number | null;
-  /** Qué equipos de la reta son el lado A y el lado B de este partido. */
+  /**
+  Qué equipos de la reta son el lado A y el lado B de este partido.
+  */
   teamAKey?: TeamKey | null;
   teamBKey?: TeamKey | null;
   scorers: {
@@ -70,44 +75,52 @@ export type MatchPrefill = {
     team: "A" | "B" | null;
     goals: number;
   }[];
-};
+}
 export const matchPrefillAtom = atomWithStorage<MatchPrefill | null>(
   "reta:match-prefill",
-  null,
+  null
 );
 
-/** Convenience writer to toggle a single player in/out of the pool. */
+/**
+Convenience writer to toggle a single player in/out of the pool.
+*/
 export const toggleSelectedAtom = atom(null, (get, set, id: number) => {
   const current = get(selectedIdsAtom);
   set(
     selectedIdsAtom,
-    current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
+    current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
   );
 });
 
 // Live match
-/** A single goal: which team, who scored (optional), and when (epoch ms). */
-export type LiveGoal = {
+/**
+A single goal: which team, who scored (optional), and when (epoch ms).
+*/
+export interface LiveGoal {
   id: string;
   team: TeamKey;
   playerId: number | null;
   at: number;
-};
+}
 
 /**
- * El partido en curso. Con 2 equipos es lo de siempre; con 3+ `teams` lleva a
- * todos, `home`/`away` son los que están en la cancha y `queue` los que
- * esperan turno (ver lib/live-rotation.ts).
+ * La reta en curso: todos sus equipos y todos los goles, sean del duelo que
+ * sean.
+ *
+ * No hay `home`/`away`/`queue` a propósito. Los hubo, para una rotación de
+ * "gana y se queda" que cerraba y guardaba un partido cada vez que cambiaba la
+ * pareja en la cancha: el registro acababa con ocho partidos de cero minutos y
+ * marcadores 0-0 que no eran partidos de nada. Lo que de verdad se guarda de
+ * una reta son los goles de cada quien, y para eso da igual quién se estaba
+ * enfrentando a quién en ese momento: basta con tener a mano el botón de cada
+ * equipo y cerrar UNA vez al final.
  */
-export type LiveMatchState = {
+export interface LiveMatchState {
   active: boolean;
   teams: { key: TeamKey; name: string }[];
-  home: TeamKey;
-  away: TeamKey;
-  queue: TeamKey[];
   startedAt: number | null;
   goals: LiveGoal[];
-};
+}
 
 export const EMPTY_LIVE_MATCH: LiveMatchState = {
   active: false,
@@ -115,9 +128,6 @@ export const EMPTY_LIVE_MATCH: LiveMatchState = {
     { key: "A", name: "Equipo A" },
     { key: "B", name: "Equipo B" },
   ],
-  home: "A",
-  away: "B",
-  queue: [],
   startedAt: null,
   goals: [],
 };
@@ -127,8 +137,13 @@ export const EMPTY_LIVE_MATCH: LiveMatchState = {
  * mid-game; cleared once the match is finalized into the registry.
  * ponytail: clave `-v2` — el estado viejo (teamA/teamB planos) simplemente se
  * ignora en vez de migrarlo; a lo mucho se pierde un marcador a medias.
+ *
+ * La clave NO subió a `-v3` al quitar `home`/`away`/`queue`: una reta guardada
+ * con esos campos conserva `teams`, `startedAt` y `goals`, que es cuanto se
+ * sigue leyendo, y los tres sobrantes se ignoran solos. Subirla habría
+ * tirado a la basura el marcador de quien tuviera una reta a medias.
  */
 export const liveMatchAtom = atomWithStorage<LiveMatchState>(
   "reta:live-match-v2",
-  EMPTY_LIVE_MATCH,
+  EMPTY_LIVE_MATCH
 );

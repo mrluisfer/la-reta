@@ -2,16 +2,25 @@ import { AppSidebar } from "@/components/app/sidebar/app-sidebar";
 import { LegalConsentGate } from "@/components/features/legal/legal-consent-alert";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { isAdmin } from "@/lib/admin";
+import { cookies } from "next/headers";
 import { AppSidebarHeader } from "./sidebar/app-sidebar-header";
 
+/**
+ * `SidebarProvider` escribe `sidebar_state` al togglear, pero su estado inicial
+ * es `defaultOpen` y nunca lee la cookie: sin esto, colapsar el sidebar duraba
+ * hasta la siguiente recarga. Se lee aquí porque el layout ya es dinámico
+ * (`isAdmin()` también toca cookies), así que no cuesta nada.
+ */
 export const AppShell = async ({
   children,
 }: {
   readonly children: React.ReactNode;
 }) => {
-  const admin = await isAdmin();
+  const [admin, cookieStore] = await Promise.all([isAdmin(), cookies()]);
+  const sidebarOpen = cookieStore.get("sidebar_state")?.value !== "false";
+
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={sidebarOpen}>
       {/* Primer tabulador de la página: salta el sidebar completo (14+ enlaces)
           y aterriza en el contenido. Invisible hasta que recibe foco. */}
       <a

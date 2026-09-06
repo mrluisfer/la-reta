@@ -8,22 +8,34 @@ import { Metadata } from "next";
 export const metadata: Metadata = { title: "En vivo · Reta Fútbol" };
 export const dynamic = "force-dynamic";
 
-export default async function LivePage() {
+const LivePage = async () => {
   const [players, unlocked] = await Promise.all([
     getPlayers(),
     isLiveUnlocked(),
   ]);
+  // Solo lo que el marcador necesita para pintar a alguien reconocible: mandar
+  // el `Player` entero cruzaría al cliente los seis atributos y la fecha de
+  // nacimiento de toda la plantilla para dibujar una lista.
   const list = [...players]
-    .map((p) => ({ id: p.id, name: p.name }))
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      displayName: p.displayName,
+      photoUrl: p.photoUrl,
+      position: p.position,
+      overall: p.overall,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="container space-y-6 lg:mx-auto">
       <PageHeader
         title="Marcador en vivo"
-        description="Lleva el marcador durante el partido. Al finalizar se guarda solo en el registro de partidos. Con 3 o más equipos, el que gana se queda y entra el siguiente."
+        description="Apunta los goles según van cayendo. Cada equipo tiene su botón, así que da igual quién esté jugando contra quién: al terminar, la reta entera se guarda como un registro con los goles de cada quien."
       />
       {unlocked ? <LiveMatch players={list} /> : <LiveLock />}
     </div>
   );
-}
+};
+
+export default LivePage;
