@@ -32,6 +32,27 @@ const navigationTheme = {
   },
 };
 
+/**
+ * Cabecera de las pantallas enteras que cuelgan de la raíz.
+ *
+ * Repite lo que `TabStack` da dentro de cada pestaña —papel de fondo, verde en
+ * el botón de volver, etiqueta y no solo el chevron— porque la pila raíz no
+ * pasa por ahí. Si algún día son tres o más, esto sube a un componente.
+ */
+const DETAIL_SCREEN = {
+  headerShown: true,
+  headerShadowVisible: false,
+  headerTintColor: Palette.accent,
+  headerStyle: { backgroundColor: Palette.paper },
+  headerTitleStyle: { color: Palette.ink },
+  headerBackButtonDisplayMode: "default",
+  // Sin esto la etiqueta es el nombre del grupo de rutas —"(tabs)"—, que es
+  // ruido interno. Genérico a propósito: a estas dos se llega desde Inicio y
+  // desde Armar, así que nombrar un origen concreto mentiría la mitad de las
+  // veces.
+  headerBackTitle: "Atrás",
+} as const;
+
 export default function RootLayout() {
   const fontsReady = useAppFonts();
 
@@ -80,6 +101,16 @@ export default function RootLayout() {
                   sheetGrabberVisible: true,
                 }}
               />
+              {/* Pantalla entera y no hoja: la ruleta es lo que se está
+                  haciendo mientras dura, no una consulta rápida, y una hoja a
+                  media altura le robaría el sitio al giro. */}
+              {/* Dos pantallas enteras colgadas de la raíz, no hojas: se
+                  abren desde varios sitios y colgarlas de una pestaña las
+                  devolvería a la equivocada. Con cabecera propia, porque sin
+                  ella la única salida sería el gesto del borde y no habría
+                  título que dijera dónde está uno. */}
+              <Stack.Screen name="casacas" options={DETAIL_SCREEN} />
+              <Stack.Screen name="retas" options={DETAIL_SCREEN} />
               <Stack.Screen
                 name="calendario"
                 options={{
