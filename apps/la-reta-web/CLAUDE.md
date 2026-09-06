@@ -55,6 +55,28 @@ FIFA-style dashboard for organizing pickup football ("la reta"). **Next 16 App R
 - **Image uploads**: Vercel Blob (`@vercel/blob`). Todo lo que sube por servidor pasa por **`lib/images.ts` `toWebp()`** (sharp: `rotate()` EXIF → `fit:"inside"` sin agrandar → WebP q80, `animated:true`; self-check `npx tsx lib/images.ts`), así que en el store siempre hay WebP ≤1600 px sin deformar. Server action `app/actions/uploads.ts` (`put`, `access:"public"`, `contentType` de `toWebp`) más un client-upload flow (`components/ImageUploader.tsx` → `app/api/blob/upload/route.ts`) donde el navegador sube **directo** a Blob: ahí el servidor nunca ve los bytes, así que la garantía es el token (`allowedContentTypes: image/webp` + 500 KB), no sharp. Store must be **public**. `lib/queries.ts` overlays a local `public/players/<id>` image over `photoUrl` when present.
 - **Casacas** (`/casacas`): a from-scratch SVG wheel (`components/features/casacas/wheel.tsx`) that randomly picks who washes the bibs. Pure logic in `lib/casacas.ts` (excludes the last 2 winners; self-check via `npx tsx lib/casacas.ts`). Persisted in `casaca_assignments` (roster `playerId` **or** guest `guestName`). Logic lives in the `useCasacaWheel` hook; UI split into `wheel-panel` / `casaca-history` / `winner-dialog`.
 
+### API pública (`/api/v1`)
+
+**La app nativa no habla con la base: habla con estas rutas.** Cualquier cambio aquí es un cambio de contrato con un cliente que se despliega aparte y puede tardar días en actualizarse, así que **se añade, no se rompe**: campo nuevo sí, campo renombrado no.
+
+- Toda ruta usa los helpers de `lib/api/respond.ts` — `handler()` envuelve para que un fallo salga como JSON y no como el HTML de error de Next (que un cliente móvil no sabe leer), `jsonOk`/`jsonError` responden, y `preflight` se re-exporta como `OPTIONS` para el CORS de Expo web. Todas van `force-dynamic`.
+- **Quién pide** lo resuelve `getActor()` (`lib/api/context.ts`): `auth()` de Clerk lee igual la cookie de la web que el `Authorization: Bearer` del móvil, así que el `userId` sale del mismo sitio en los dos. El gate de PIN viaja en `x-reta-pin-token` porque `Authorization` ya está ocupado y en el teléfono no hay cookie httpOnly que valga.
+- **Quién es el sujeto lo dice el token, nunca el cuerpo.** Reclamar una ficha, firmar un comentario o apuntar un turno de casacas sacan la identidad de la sesión; el cuerpo solo trae el objeto.
+- Las rutas envuelven las mismas server actions que usa la web (`app/actions/*`) siempre que exista una. Cuando no —editar el comentario propio— la lógica vive en la ruta y queda anotado ahí por qué.
+
+| Ruta | Métodos |
+| --- | --- |
+| `/players`, `/players/[id]` | GET · PATCH (dueño o admin, nunca los atributos) |
+| `/players/[id]/profile` | GET — historial de atributos, premios, casacas y reseñas en una consulta |
+| `/players/[id]/comments`, `/[commentId]` | POST · PATCH (solo el propio, filtrado por `author_id` en el mismo UPDATE) |
+| `/players/[id]/claim`, `/players/me` | POST · GET — vinculación cuenta ↔ ficha |
+| `/matches`, `/matches/[id]/votes` | GET · POST · DELETE |
+| `/retas`, `/retas/[id]` | GET · POST (pide cuenta: ese historial es la memoria del repartidor) |
+| `/casacas` | GET · POST |
+| `/player-signups`, `/uploads`, `/avatar`, `/auth/pin`, `/reta-words` | — |
+
+`/avatar` recorta a círculo con sharp y **no pide sesión** a propósito: el cargador de imágenes nativo no manda cabeceras. Su `ALLOWED_HOSTS` es la defensa — solo hosts de Clerk.
+
 ### UI conventions
 
 - Display font is **Oswald** via `next/font` (`--font-oswald`). Tailwind v4 did NOT generate `font-display` from the `@theme` token — it's hand-defined in `app/globals.css` (`@layer utilities`). Use `font-display`.

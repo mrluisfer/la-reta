@@ -12,6 +12,15 @@ Cada workspace tiene su propio `CLAUDE.md` con lo que hace falta saber **antes**
 - **Nada de datos inventados.** Si un dato no está en la base, no se enseña una estimación con cara de dato. Antes va un hueco honesto que un número bonito.
 - **Verifica antes de decir que funciona.** La app se prueba en el simulador y la web con `npm run build`. "Debería funcionar" no es una comprobación.
 
+## Al terminar un cambio
+
+Dos archivos se quedan viejos solos si nadie los toca, y los dos son el contexto del siguiente que llegue:
+
+1. **`CHANGELOG.md`** si el cambio se nota al usar la app o la web. En "Sin publicar", marcado con 📱 / 🖥️ / 🌐 y contado para quien juega. Las instrucciones completas están en un comentario dentro del propio archivo. Un refactor o una poda no van ahí: eso es lo que cuenta el commit.
+2. **El `CLAUDE.md` del workspace** si cambió algo estructural — una ruta nueva de `/api/v1`, una convención de navegación, una pieza de la interfaz que hay que reutilizar en vez de rehacer. La regla para saber si toca: _¿lo habría adivinado leyendo el código, o lo aprendí a base de romperlo?_ Lo segundo se escribe.
+
+Y en el mensaje del commit va el porqué técnico: qué se probó, qué falló y por qué la solución es esa. Es lo único que sobrevive a que se pierda el hilo.
+
 ## Estándares de código
 
 Lint y formato son Ultracite (ESLint + Prettier + Stylelint) desde la raíz. Sus reglas están en `.claude/CLAUDE.md` — léelas antes de escribir. `npm run check` verifica y `npm run fix` autocorrige.
